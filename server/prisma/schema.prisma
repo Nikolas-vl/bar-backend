@@ -4,11 +4,157 @@
 // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
-generator client {
-  provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
-}
-
 datasource db {
   provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "./generated"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+  role      UserRole @default(USER)
+
+  orders         Order[]
+  reservations   Reservation[]
+  addresses      Address[]
+  paymentMethods PaymentMethod[]
+}
+
+enum Category {
+  BREAKFAST
+  LUNCH
+}
+
+model Dish {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String?
+  price       Float
+  imageUrl    String?
+  calories    Int?
+  protein     Float?
+  fat         Float?
+  carbs       Float?
+
+  category    Category         @default(BREAKFAST)
+  isAvailable Boolean          @default(true)
+  ingredients DishIngredient[]
+  orderItems  OrderItem[]
+}
+
+model Ingredient {
+  id    Int    @id @default(autoincrement())
+  name  String
+  price Float?
+
+  dishes DishIngredient[]
+}
+
+model DishIngredient {
+  dishId       Int
+  ingredientId Int
+  optional     Boolean @default(false)
+  quantity     Float   @default(1.0)
+
+  dish       Dish       @relation(fields: [dishId], references: [id])
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id])
+
+  @@id([dishId, ingredientId])
+}
+
+enum OrderType {
+  DINE_IN
+  DELIVERY
+  TAKE_OUT
+}
+
+enum OrderStatus {
+  NEW
+  PAID
+  PREPARING
+  COMPLETED
+  CANCELED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+model Order {
+  id            Int         @id @default(autoincrement())
+  userId        Int
+  type          OrderType
+  status        OrderStatus @default(NEW)
+  total         Float
+  paymentStatus String      @default("PENDING")
+  comment       String?
+  createdAt     DateTime    @default(now())
+
+  user  User        @relation(fields: [userId], references: [id])
+  items OrderItem[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id       Int @id @default(autoincrement())
+  orderId  Int
+  dishId   Int
+  quantity Int @default(1)
+
+  order Order @relation(fields: [orderId], references: [id])
+  dish  Dish  @relation(fields: [dishId], references: [id])
+
+  @@index([orderId])
+  @@index([dishId])
+}
+
+model Reservation {
+  id     Int      @id @default(autoincrement())
+  userId Int
+  date   DateTime
+  guests Int
+  user   User     @relation(fields: [userId], references: [id])
+
+  @@index([date])
+  @@index([userId])
+}
+
+model Address {
+  id     Int    @id @default(autoincrement())
+  userId Int
+  city   String
+  street String
+  zip    String
+  phone  String @default("000000000")
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model PaymentMethod {
+  id       Int    @id @default(autoincrement())
+  userId   Int
+  cardType String
+  last4    String
+  expMonth Int
+  expYear  Int
+
+  user User @relation(fields: [userId], references: [id])
 }
