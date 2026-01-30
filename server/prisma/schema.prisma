@@ -4,13 +4,13 @@
 // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
-datasource db {
-  provider = "postgresql"
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
 }
 
-generator client {
-  provider = "prisma-client-js"
-  output   = "./generated"
+datasource db {
+  provider = "postgresql"
 }
 
 enum UserRole {
@@ -19,12 +19,13 @@ enum UserRole {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
-  name      String?
-  createdAt DateTime @default(now())
-  role      UserRole @default(USER)
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  password     String
+  name         String?
+  createdAt    DateTime @default(now())
+  role         UserRole @default(USER)
+  refreshToken String?
 
   orders         Order[]
   reservations   Reservation[]
