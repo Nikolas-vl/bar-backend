@@ -6,8 +6,8 @@ node_modules
 .idea
 
 
-/src/generated/prisma
-
+/src/generated
+generated
 # Logs
 logs
 *.log
