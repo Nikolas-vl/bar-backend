@@ -69,6 +69,9 @@ export const login = async (req: Request, res: Response) => {
   });
 
   res.json({ accessToken });
+  console.log("ACCESS SECRET:", process.env.JWT_ACCESS_SECRET);
+  console.log("REFRESH SECRET:", process.env.JWT_REFRESH_SECRET);
+
 };
 
 
