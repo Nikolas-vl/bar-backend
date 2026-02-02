@@ -12,9 +12,9 @@ if (!env.accessSecret || !env.refreshSecret) {
   throw new Error("JWT secrets missing");
 }
 
-export const generateAccessToken = (userId: number) => {
+export const generateAccessToken = (userId: number, role: string) => {
   return jwt.sign(
-    { userId },
+    { userId, role },
     env.accessSecret,
     { expiresIn: env.accessExpires }
   );

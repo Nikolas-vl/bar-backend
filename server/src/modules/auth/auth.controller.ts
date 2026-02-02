@@ -54,7 +54,7 @@ export const login = async (req: Request, res: Response) => {
     return res.status(400).json({ message: 'Invalid credentials' });
   }
 
-  const accessToken = generateAccessToken(user.id);
+  const accessToken = generateAccessToken(user.id, user.role);
   const refreshToken = generateRefreshToken(user.id);
 
   await updateRefreshToken(user.id, refreshToken);
@@ -108,7 +108,7 @@ export const refresh = async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'Session compromised' });
     }
 
-    const newAccessToken = generateAccessToken(user.id);
+    const newAccessToken = generateAccessToken(user.id, user.role);
     const newRefreshToken = generateRefreshToken(user.id);
 
     await updateRefreshToken(user.id, newRefreshToken);
