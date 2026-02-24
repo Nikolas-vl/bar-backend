@@ -7,7 +7,7 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
       url: req.originalUrl,
       method: req.method,
     },
-    'Unhandled error'
+    'Unhandled error',
   );
 
   res.status(err.status || 500).json({

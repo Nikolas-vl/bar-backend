@@ -6,27 +6,25 @@ type EntityWithUserId = {
 };
 
 export const ownsResource =
-
   <T extends EntityWithUserId>(
-    getResource: (req: Request) => Promise<T | null>
+    getResource: (req: Request) => Promise<T | null>,
   ) =>
-    async (req: Request, res: Response, next: NextFunction) => {
-      const resource = await getResource(req);
-      if (req.role === 'ADMIN') {
-        return next();
-      }
-      if (!resource || resource.userId !== req.userId) {
-        return res.status(403).json({ message: 'Forbidden' });
-      }
+  async (req: Request, res: Response, next: NextFunction) => {
+    const resource = await getResource(req);
+    if (req.role === 'ADMIN') {
+      return next();
+    }
+    if (!resource || resource.userId !== req.userId) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
 
-      (req as any).resource = resource;
+    (req as any).resource = resource;
 
-      next();
-    };
-
+    next();
+  };
 
 export const ownsAddress = ownsResource((req) =>
-  getAddressById(+req.params.id)
+  getAddressById(+req.params.id),
 );
 
 // export const ownsOrder = ownsResource((req) =>

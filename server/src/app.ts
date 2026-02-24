@@ -1,9 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import pinoHttp from 'pino-http'
+import pinoHttp from 'pino-http';
 import routes from './routes';
-import { logger } from "./utils/logger";
+import { logger } from './utils/logger';
 import { errorHandler } from './middlewares/errorHandler';
 import { asCorsHandler, useHandlers } from './utils/express';
 

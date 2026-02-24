@@ -14,8 +14,6 @@ import {
 
 const isProd = process.env.NODE_ENV === 'production';
 
-
-
 export const register = async (req: Request, res: Response) => {
   const { email, password } = req.body;
   req.log.info({ email }, 'Register attempt');
@@ -34,8 +32,6 @@ export const register = async (req: Request, res: Response) => {
     email: user.email,
   });
 };
-
-
 
 export const login = async (req: Request, res: Response) => {
   const { email } = req.body;
@@ -69,12 +65,9 @@ export const login = async (req: Request, res: Response) => {
   });
 
   res.json({ accessToken });
-  console.log("ACCESS SECRET:", process.env.JWT_ACCESS_SECRET);
-  console.log("REFRESH SECRET:", process.env.JWT_REFRESH_SECRET);
-
+  console.log('ACCESS SECRET:', process.env.JWT_ACCESS_SECRET);
+  console.log('REFRESH SECRET:', process.env.JWT_REFRESH_SECRET);
 };
-
-
 
 export const refresh = async (req: Request, res: Response) => {
   const oldRefreshToken = req.cookies.refreshToken;
@@ -92,7 +85,7 @@ export const refresh = async (req: Request, res: Response) => {
     if (!user) {
       req.log.error(
         { userId: payload.userId },
-        'Refresh token reuse detected. Session compromised.'
+        'Refresh token reuse detected. Session compromised.',
       );
 
       await updateRefreshToken(payload.userId, null);
@@ -103,7 +96,7 @@ export const refresh = async (req: Request, res: Response) => {
     if (user.id !== payload.userId) {
       req.log.error(
         { tokenUserId: payload.userId, dbUserId: user.id },
-        'Refresh token payload mismatch'
+        'Refresh token payload mismatch',
       );
 
       await updateRefreshToken(user.id, null);
@@ -124,14 +117,11 @@ export const refresh = async (req: Request, res: Response) => {
     });
 
     res.json({ accessToken: newAccessToken });
-
   } catch (err) {
     req.log.warn('Invalid refresh token signature');
     return res.status(401).json({ message: 'Invalid refresh token' });
   }
 };
-
-
 
 export const logout = async (req: Request, res: Response) => {
   const refreshToken = req.cookies.refreshToken;

@@ -1,4 +1,5 @@
 import prisma from '../../prisma';
+import { Prisma } from '@prisma/client';
 
 export const getUserById = (id: number) => {
   return prisma.user.findUnique({
@@ -6,7 +7,7 @@ export const getUserById = (id: number) => {
   });
 };
 
-export const updateUser = (id: number, data: any) => {
+export const updateUser = (id: number, data: Prisma.UserUpdateInput) => {
   return prisma.user.update({
     where: { id },
     data,

@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
-import { createAddress, deleteAddress, getAddressById, getAddresses, updateAddress } from './address.service';
-
+import { createAddress, deleteAddress, getAddresses, updateAddress } from './address.service';
 
 export const createMyAddress = async (req: Request, res: Response): Promise<void> => {
   const address = await createAddress(req.userId!, req.body);
@@ -22,7 +21,7 @@ export const deleteMyAddress = async (req: Request, res: Response) => {
 export const updateMyAddress = async (req: Request, res: Response) => {
   const address = req.resource!;
 
-  const { userId, ...data } = req.body;
+  const data = req.body;
   const updated = await updateAddress(address.id, data);
 
   res.json(updated);

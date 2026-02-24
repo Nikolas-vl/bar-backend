@@ -6,5 +6,3 @@ const router = Router();
 router.get('/me', getMyProfile);
 router.patch('/me', updateMyProfile);
 export default router;
-
-

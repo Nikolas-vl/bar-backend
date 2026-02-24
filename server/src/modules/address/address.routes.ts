@@ -9,19 +9,8 @@ const router = Router();
 
 router.post('/', requireAuth, validate(createAddressSchema), createMyAddress);
 router.get('/', requireAuth, getMyAddresses);
-router.patch(
-  '/:id',
-  requireAuth,
-  validate(updateAddressSchema),
-  ownsAddress,
-  updateMyAddress
-);
+router.patch('/:id', requireAuth, validate(updateAddressSchema), ownsAddress, updateMyAddress);
 
-router.delete(
-  '/:id',
-  requireAuth,
-  ownsAddress,
-  deleteMyAddress
-);
+router.delete('/:id', requireAuth, ownsAddress, deleteMyAddress);
 
 export default router;

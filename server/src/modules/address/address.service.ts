@@ -1,10 +1,15 @@
 import prisma from '../../prisma';
+import { Prisma } from '../../generated/browser';
 
-export const createAddress = (userId: number, data: any) => {
+export const createAddress = (userId: number, data: Prisma.AddressCreateInput) => {
   return prisma.address.create({
     data: {
       ...data,
-      userId,
+      user: {
+        connect: {
+          id: userId,
+        },
+      },
     },
   });
 };
@@ -27,7 +32,7 @@ export const deleteAddress = (id: number) => {
   });
 };
 
-export const updateAddress = (id: number, data: any) => {
+export const updateAddress = (id: number, data: Prisma.AddressUpdateInput) => {
   return prisma.address.update({
     where: { id },
     data,
