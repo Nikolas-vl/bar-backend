@@ -5,8 +5,10 @@
     "outDir": "./dist",
     "strict": true,
     "esModuleInterop": true,
-    "types": ["node"],
-    "skipLibCheck": true
+    "types": ["node", "express", "express-serve-static-core"],
+    "typeRoots": ["./src/types", "./node_modules/@types"],
+    "skipLibCheck": true,
+    "declaration": true
   },
   "include": ["src", "prisma", "*.ts"]
 }

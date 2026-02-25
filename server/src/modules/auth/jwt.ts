@@ -1,6 +1,5 @@
 import jwt from 'jsonwebtoken';
 
-
 export const env = {
   accessSecret: process.env.JWT_ACCESS_SECRET!,
   refreshSecret: process.env.JWT_REFRESH_SECRET!,
@@ -9,23 +8,19 @@ export const env = {
 };
 
 if (!env.accessSecret || !env.refreshSecret) {
-  throw new Error("JWT secrets missing");
+  throw new Error('JWT secrets missing');
 }
 
 export const generateAccessToken = (userId: number, role: string) => {
-  return jwt.sign(
-    { userId, role },
-    env.accessSecret,
-    { expiresIn: env.accessExpires }
-  );
+  return jwt.sign({ userId, role }, env.accessSecret, {
+    expiresIn: env.accessExpires,
+  });
 };
 
 export const generateRefreshToken = (userId: number) => {
-  return jwt.sign(
-    { userId },
-    env.refreshSecret,
-    { expiresIn: env.refreshExpires }
-  );
+  return jwt.sign({ userId }, env.refreshSecret, {
+    expiresIn: env.refreshExpires,
+  });
 };
 
 export const verifyAccessToken = (token: string) => {

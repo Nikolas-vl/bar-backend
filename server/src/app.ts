@@ -1,26 +1,22 @@
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import pinoHttp from 'pino-http'
+import pinoHttp from 'pino-http';
 import routes from './routes';
-import { logger } from "./utils/logger";
+import { logger } from './utils/logger';
 import { errorHandler } from './middlewares/errorHandler';
+import { asCorsHandler, useHandlers } from './utils/express';
 
 const app = express();
 
-app.use(
-  cors({
-    origin: 'http://localhost:4000',
-    credentials: true,
-  })
-);
-app.use(
-  pinoHttp({
-    logger,
-  })
-)
-app.use(express.json());
-app.use(cookieParser());
+const corsMiddleware = cors({
+  origin: 'http://localhost:4000',
+  credentials: true,
+});
+
+app.use(asCorsHandler(corsMiddleware));
+const httpLogger = pinoHttp({ logger });
+useHandlers(app, httpLogger, express.json(), cookieParser());
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });

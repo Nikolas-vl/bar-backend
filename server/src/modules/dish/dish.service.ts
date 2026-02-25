@@ -1,4 +1,5 @@
 import prisma from '../../prisma';
+import { Prisma } from '@prisma/client';
 
 export const getAllDishes = () => {
   return prisma.dish.findMany({
@@ -12,7 +13,7 @@ export const getAllDishes = () => {
   });
 };
 
-export const createDish = (data: any) => {
+export const createDish = (data: Prisma.DishCreateInput) => {
   return prisma.dish.create({
     data,
   });
