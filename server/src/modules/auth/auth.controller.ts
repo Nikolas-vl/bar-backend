@@ -1,16 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
-import {
-  createUser,
-  findUserByEmail,
-  updateRefreshToken,
-  findUserByRefreshToken,
-} from './auth.service';
-import {
-  generateAccessToken,
-  generateRefreshToken,
-  verifyRefreshToken,
-} from './jwt';
+import { createUser, findUserByEmail, updateRefreshToken, findUserByRefreshToken } from './auth.service';
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from './jwt';
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -83,10 +74,7 @@ export const refresh = async (req: Request, res: Response) => {
     const user = await findUserByRefreshToken(oldRefreshToken);
 
     if (!user) {
-      req.log.error(
-        { userId: payload.userId },
-        'Refresh token reuse detected. Session compromised.',
-      );
+      req.log.error({ userId: payload.userId }, 'Refresh token reuse detected. Session compromised.');
 
       await updateRefreshToken(payload.userId, null);
 
@@ -94,10 +82,7 @@ export const refresh = async (req: Request, res: Response) => {
     }
 
     if (user.id !== payload.userId) {
-      req.log.error(
-        { tokenUserId: payload.userId, dbUserId: user.id },
-        'Refresh token payload mismatch',
-      );
+      req.log.error({ tokenUserId: payload.userId, dbUserId: user.id }, 'Refresh token payload mismatch');
 
       await updateRefreshToken(user.id, null);
 

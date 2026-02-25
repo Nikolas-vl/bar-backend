@@ -3,10 +3,8 @@ import jwt from 'jsonwebtoken';
 export const env = {
   accessSecret: process.env.JWT_ACCESS_SECRET!,
   refreshSecret: process.env.JWT_REFRESH_SECRET!,
-  accessExpires: (process.env.JWT_ACCESS_EXPIRES ||
-    '15m') as jwt.SignOptions['expiresIn'],
-  refreshExpires: (process.env.JWT_REFRESH_EXPIRES ||
-    '7d') as jwt.SignOptions['expiresIn'],
+  accessExpires: (process.env.JWT_ACCESS_EXPIRES || '15m') as jwt.SignOptions['expiresIn'],
+  refreshExpires: (process.env.JWT_REFRESH_EXPIRES || '7d') as jwt.SignOptions['expiresIn'],
 };
 
 if (!env.accessSecret || !env.refreshSecret) {
