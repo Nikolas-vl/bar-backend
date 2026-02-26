@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import { Response, Request } from 'express';
 import { getUserById, updateUser } from './users.service';
-import { Prisma } from '../../generated/browser';
+import { Prisma } from '../../../generated/prisma/client';
 
 export const getMyProfile = async (req: Request, res: Response) => {
   const user = await getUserById(req.userId!);

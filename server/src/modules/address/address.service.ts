@@ -1,5 +1,5 @@
+import { Prisma } from '../../../generated/prisma/client';
 import prisma from '../../prisma';
-import { Prisma } from '../../generated/browser';
 
 export const createAddress = (userId: number, data: Prisma.AddressCreateInput) => {
   return prisma.address.create({

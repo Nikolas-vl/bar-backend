@@ -150,12 +150,15 @@ model Address {
 }
 
 model PaymentMethod {
-  id       Int    @id @default(autoincrement())
-  userId   Int
-  cardType String
-  last4    String
-  expMonth Int
-  expYear  Int
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  cardType  String
+  last4     String   @db.VarChar(4)
+  expMonth  Int
+  expYear   Int
+  createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
