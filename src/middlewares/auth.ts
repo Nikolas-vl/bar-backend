@@ -19,7 +19,7 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
     req.role = payload.role;
 
     next();
-  } catch (err) {
+  } catch {
     return res.status(401).json({ message: 'Invalid token' });
   }
 };

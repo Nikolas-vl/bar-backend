@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { getAddressById } from '../modules/address/address.service';
 
 type EntityWithUserId = {
+  id: number;
   userId: number;
 };
 
@@ -16,7 +17,7 @@ export const ownsResource =
       return res.status(403).json({ message: 'Forbidden' });
     }
 
-    (req as any).resource = resource;
+    req.resource = resource;
 
     next();
   };
