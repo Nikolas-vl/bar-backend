@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { createAddress, deleteAddress, getAddresses, updateAddress } from './address.service';
 
-export const createMyAddress = async (req: Request, res: Response): Promise<void> => {
+export const createMyAddress = async (req: Request, res: Response) => {
   const address = await createAddress(req.userId!, req.body);
   res.status(201).json(address);
 };

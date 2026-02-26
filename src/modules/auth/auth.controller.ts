@@ -51,13 +51,11 @@ export const login = async (req: Request, res: Response) => {
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
     secure: isProd,
-    sameSite: isProd ? 'strict' : 'none',
+    sameSite: isProd ? 'strict' : 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
   res.json({ accessToken });
-  console.log('ACCESS SECRET:', process.env.JWT_ACCESS_SECRET);
-  console.log('REFRESH SECRET:', process.env.JWT_REFRESH_SECRET);
 };
 
 export const refresh = async (req: Request, res: Response) => {
@@ -97,12 +95,12 @@ export const refresh = async (req: Request, res: Response) => {
     res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
       secure: isProd,
-      sameSite: isProd ? 'strict' : 'none',
+      sameSite: isProd ? 'strict' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     res.json({ accessToken: newAccessToken });
-  } catch (err) {
+  } catch {
     req.log.warn('Invalid refresh token signature');
     return res.status(401).json({ message: 'Invalid refresh token' });
   }

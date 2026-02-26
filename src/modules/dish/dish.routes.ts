@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getDishes, createDish } from './dish.controller';
-import { createDishSchema } from '../../validation/dish.schema';
+import { createDishSchema } from './dish.schema';
 import { validate } from '../../middlewares/validate';
 
 const router = Router();

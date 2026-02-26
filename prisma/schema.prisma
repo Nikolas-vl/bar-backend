@@ -96,14 +96,14 @@ enum PaymentStatus {
 }
 
 model Order {
-  id            Int         @id @default(autoincrement())
+  id            Int           @id @default(autoincrement())
   userId        Int
   type          OrderType
-  status        OrderStatus @default(NEW)
+  status        OrderStatus   @default(NEW)
   total         Float
-  paymentStatus String      @default("PENDING")
+  paymentStatus PaymentStatus @default(PENDING)
   comment       String?
-  createdAt     DateTime    @default(now())
+  createdAt     DateTime      @default(now())
 
   user  User        @relation(fields: [userId], references: [id])
   items OrderItem[]

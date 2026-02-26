@@ -1,5 +1,5 @@
 import prisma from '../../prisma';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../../generated/prisma/client';
 
 export const getAllDishes = () => {
   return prisma.dish.findMany({

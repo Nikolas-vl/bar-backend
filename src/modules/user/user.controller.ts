@@ -1,7 +1,6 @@
 import bcrypt from 'bcrypt';
 import { Response, Request } from 'express';
-import { getUserById, updateUser } from './users.service';
-import { Prisma } from '../../../generated/prisma/client';
+import { getUserById, updateUser } from './user.service';
 
 export const getMyProfile = async (req: Request, res: Response) => {
   const user = await getUserById(req.userId!);
@@ -19,7 +18,7 @@ export const updateMyProfile = async (req: Request, res: Response) => {
   const userId = req.userId!;
   const { name, password } = req.body;
 
-  const data: Prisma.UserUpdateInput = {};
+  const data: Record<string, string> = {};
   if (name) data.name = name;
   if (password) data.password = await bcrypt.hash(password, 10);
 
