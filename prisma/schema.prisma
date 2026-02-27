@@ -46,17 +46,31 @@ model Cart {
 }
 
 model CartItem {
-  id       Int @id @default(autoincrement())
+  id       Int     @id @default(autoincrement())
   cartId   Int
   dishId   Int
-  quantity Int @default(1)
+  quantity Int     @default(1)
+  note     String?
 
-  cart Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  dish Dish @relation(fields: [dishId], references: [id], onDelete: Cascade)
+  cart   Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  dish   Dish            @relation(fields: [dishId], references: [id], onDelete: Cascade)
+  extras CartItemExtra[]
 
-  @@unique([cartId, dishId])
   @@index([cartId])
   @@index([dishId])
+}
+
+model CartItemExtra {
+  id           Int   @id @default(autoincrement())
+  cartItemId   Int
+  ingredientId Int
+  quantity     Float @default(1.0)
+
+  cartItem   CartItem   @relation(fields: [cartItemId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@unique([cartItemId, ingredientId])
+  @@index([cartItemId])
 }
 
 enum Category {
@@ -87,7 +101,8 @@ model Ingredient {
   name  String
   price Float?
 
-  dishes DishIngredient[]
+  dishes         DishIngredient[]
+  cartItemExtras CartItemExtra[]
 }
 
 model DishIngredient {
