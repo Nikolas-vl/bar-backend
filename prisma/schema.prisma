@@ -69,8 +69,8 @@ model DishIngredient {
   optional     Boolean @default(false)
   quantity     Float   @default(1.0)
 
-  dish       Dish       @relation(fields: [dishId], references: [id])
-  ingredient Ingredient @relation(fields: [ingredientId], references: [id])
+  dish       Dish       @relation(fields: [dishId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
 
   @@id([dishId, ingredientId])
 }
@@ -119,8 +119,8 @@ model OrderItem {
   dishId   Int
   quantity Int @default(1)
 
-  order Order @relation(fields: [orderId], references: [id])
-  dish  Dish  @relation(fields: [dishId], references: [id])
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  dish  Dish  @relation(fields: [dishId], references: [id], onDelete: Restrict)
 
   @@index([orderId])
   @@index([dishId])

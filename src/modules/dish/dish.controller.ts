@@ -14,7 +14,7 @@ import { DishQuery } from './dish.schema';
 export const getDishes = async (req: Request, res: Response) => {
   req.log.info({ query: req.query }, 'Fetching dishes');
 
-  const dishes = await getAllDishes(req.query as unknown as DishQuery);
+  const dishes = await getAllDishes(req.query as DishQuery);
   res.json(dishes);
 };
 

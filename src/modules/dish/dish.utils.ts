@@ -1,5 +1,5 @@
-import { Prisma } from '../../../../generated/prisma/client';
-import { DishQuery } from '../dish.schema';
+import { Prisma } from '../../../generated/prisma/client';
+import { DishQuery } from './dish.schema';
 
 export const buildDishWhere = (query?: DishQuery): Prisma.DishWhereInput => {
   if (!query) return {};

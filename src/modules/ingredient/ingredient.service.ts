@@ -59,8 +59,6 @@ export const updateIngredient = (id: number, data: UpdateIngredient) => {
 };
 
 export const deleteIngredient = (id: number) => {
-  // Note: This will fail if ingredient is used in dishes
-  // Consider adding cascade delete or checking usage first
   return prisma.ingredient.delete({
     where: { id },
   });

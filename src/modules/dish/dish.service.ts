@@ -1,7 +1,7 @@
 import prisma from '../../prisma';
 import { Prisma } from '../../../generated/prisma/client';
 import { CreateDish, DishQuery, UpdateDish, AddIngredientToDish, UpdateDishIngredient } from './dish.schema';
-import { buildDishWhere } from './helpers/helpers';
+import { buildDishWhere } from './dish.utils';
 
 const dishInclude = {
   ingredients: {

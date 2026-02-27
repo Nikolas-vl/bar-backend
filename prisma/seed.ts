@@ -1,4 +1,4 @@
-import { UserRole, Category, OrderType, OrderStatus } from '../generated/prisma/enums';
+import { UserRole, Category, OrderType, OrderStatus, PaymentStatus } from '../generated/prisma/enums';
 import * as bcrypt from 'bcrypt';
 import { prisma } from '../src/prisma';
 
@@ -345,7 +345,7 @@ async function main() {
       type: OrderType.DELIVERY,
       status: OrderStatus.COMPLETED,
       total: 27.98,
-      paymentStatus: 'PAID',
+      paymentStatus: PaymentStatus.PAID,
       comment: 'Please ring the doorbell',
       items: {
         create: [
@@ -362,7 +362,7 @@ async function main() {
       type: OrderType.DINE_IN,
       status: OrderStatus.PREPARING,
       total: 32.98,
-      paymentStatus: 'PAID',
+      paymentStatus: PaymentStatus.PAID,
       items: {
         create: [
           { dishId: lunchDishes[2].id, quantity: 1 },
@@ -378,7 +378,7 @@ async function main() {
       type: OrderType.TAKE_OUT,
       status: OrderStatus.NEW,
       total: 14.99,
-      paymentStatus: 'PENDING',
+      paymentStatus: PaymentStatus.PENDING,
       comment: 'Extra sauce please',
       items: {
         create: [
@@ -394,7 +394,7 @@ async function main() {
       type: OrderType.DELIVERY,
       status: OrderStatus.PAID,
       total: 45.97,
-      paymentStatus: 'PAID',
+      paymentStatus: PaymentStatus.PAID,
       items: {
         create: [
           { dishId: lunchDishes[0].id, quantity: 2 },

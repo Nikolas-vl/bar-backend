@@ -7,23 +7,11 @@ import {
   updateIngredient as updateIngredientService,
   getDishesByIngredient,
 } from './ingredient.service';
-
-import { ingredientQuerySchema } from './ingredient.schema';
+import { IngredientQuery } from './ingredient.schema';
 
 export const getIngredients = async (req: Request, res: Response) => {
   req.log.info({ query: req.query }, 'Fetching ingredients');
-
-  const result = ingredientQuerySchema.safeParse(req.query);
-
-  if (!result.success) {
-    req.log.warn({ issues: result.error.issues, query: req.query }, 'Invalid query parameters');
-    return res.status(400).json({
-      message: 'Invalid query parameters',
-      issues: result.error.issues,
-    });
-  }
-
-  const ingredients = await getAllIngredients(result.data);
+  const ingredients = await getAllIngredients(req.query as IngredientQuery);
   res.json(ingredients);
 };
 

@@ -39,7 +39,7 @@ export const dishQuerySchema = z.object({
       return val;
     }, z.boolean())
     .optional(),
-  sortBy: z.enum(['name', 'price', 'calories', 'createdAt']).optional(),
+  sortBy: z.enum(['name', 'price', 'calories', 'protein', 'fat', 'carbs']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional(),
 });
 

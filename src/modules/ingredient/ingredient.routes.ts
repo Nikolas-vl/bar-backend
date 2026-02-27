@@ -7,7 +7,7 @@ import {
   deleteIngredient,
   getDishesWithIngredient,
 } from './ingredient.controller';
-import { createIngredientSchema, updateIngredientSchema } from './ingredient.schema';
+import { createIngredientSchema, ingredientQuerySchema, updateIngredientSchema } from './ingredient.schema';
 import { validate } from '../../middlewares/validate';
 import { requireAuth } from '../../middlewares/auth';
 import { requireRole } from '../../middlewares/role.middleware';
@@ -15,7 +15,7 @@ import { requireRole } from '../../middlewares/role.middleware';
 const router = Router();
 
 // Public routes
-router.get('/', getIngredients);
+router.get('/', validate(ingredientQuerySchema, 'query'), getIngredients);
 router.get('/:id', getIngredient);
 router.get('/:id/dishes', getDishesWithIngredient);
 
