@@ -9,8 +9,18 @@ import {
   addExtraToCartItem,
   updateExtraInCartItem,
   removeExtraFromCartItem,
+  addIngredientToCart,
+  updateIngredientItemHandler,
+  removeIngredientFromCart,
 } from './cart.controller';
-import { cartItemSchema, updateCartItemSchema, cartItemExtraSchema, updateCartItemExtraSchema } from './cart.schema';
+import {
+  cartItemSchema,
+  updateCartItemSchema,
+  cartItemExtraSchema,
+  updateCartItemExtraSchema,
+  cartIngredientItemSchema,
+  updateCartIngredientItemSchema,
+} from './cart.schema';
 
 const router = Router();
 
@@ -23,9 +33,13 @@ router.post('/items', validate(cartItemSchema), addToCart);
 router.patch('/items/:cartItemId', validate(updateCartItemSchema), updateCartItemHandler);
 router.delete('/items/:cartItemId', removeFromCart);
 
-// Cart item extras
+// Extras scoped to a specific cart item
 router.post('/items/:cartItemId/extras', validate(cartItemExtraSchema), addExtraToCartItem);
 router.patch('/items/:cartItemId/extras/:ingredientId', validate(updateCartItemExtraSchema), updateExtraInCartItem);
 router.delete('/items/:cartItemId/extras/:ingredientId', removeExtraFromCartItem);
+
+router.post('/ingredients', validate(cartIngredientItemSchema), addIngredientToCart);
+router.patch('/ingredients/:itemId', validate(updateCartIngredientItemSchema), updateIngredientItemHandler);
+router.delete('/ingredients/:itemId', removeIngredientFromCart);
 
 export default router;

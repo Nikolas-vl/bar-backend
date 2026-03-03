@@ -5,8 +5,11 @@ import {
   updateCartItem,
   removeItemFromCart,
   clearCart as clearCartService,
-  addCartItemExtra,
+  addIngredientItemToCart,
+  updateIngredientItem,
+  removeIngredientItem,
   updateCartItemExtra,
+  addCartItemExtra,
   removeCartItemExtra,
 } from './cart.service';
 
@@ -22,15 +25,8 @@ export const addToCart = async (req: Request, res: Response) => {
   const userId = req.userId!;
   req.log.info({ userId, body: req.body }, 'Adding item to cart');
 
-  try {
-    const cartItem = await addItemToCart(userId, req.body);
-    res.status(201).json(cartItem);
-  } catch (error) {
-    if (error instanceof Error && error.message === 'Dish not found') {
-      return res.status(404).json({ message: error.message });
-    }
-    throw error;
-  }
+  const cartItem = await addItemToCart(userId, req.body);
+  res.status(201).json(cartItem);
 };
 
 export const updateCartItemHandler = async (req: Request, res: Response) => {
@@ -39,15 +35,11 @@ export const updateCartItemHandler = async (req: Request, res: Response) => {
 
   req.log.info({ userId, cartItemId, body: req.body }, 'Updating cart item');
 
-  try {
-    const updated = await updateCartItem(userId, cartItemId, req.body);
-    res.json(updated);
-  } catch (error) {
-    if (error instanceof Error && error.message === 'Item not found in cart') {
-      return res.status(404).json({ message: error.message });
-    }
-    throw error;
+  const updated = await updateCartItem(userId, cartItemId, req.body);
+  if (!updated) {
+    return res.status(204).end();
   }
+  res.json(updated);
 };
 
 export const removeFromCart = async (req: Request, res: Response) => {
@@ -56,15 +48,8 @@ export const removeFromCart = async (req: Request, res: Response) => {
 
   req.log.info({ userId, cartItemId }, 'Removing item from cart');
 
-  try {
-    await removeItemFromCart(userId, cartItemId);
-    res.status(204).end();
-  } catch (error) {
-    if (error instanceof Error && error.message === 'Item not found in cart') {
-      return res.status(404).json({ message: error.message });
-    }
-    throw error;
-  }
+  await removeItemFromCart(userId, cartItemId);
+  res.status(204).end();
 };
 
 export const clearCart = async (req: Request, res: Response) => {
@@ -83,18 +68,8 @@ export const addExtraToCartItem = async (req: Request, res: Response) => {
 
   req.log.info({ userId, cartItemId, body: req.body }, 'Adding extra to cart item');
 
-  try {
-    const extra = await addCartItemExtra(userId, cartItemId, req.body);
-    res.status(201).json(extra);
-  } catch (error) {
-    if (error instanceof Error && error.message === 'Item not found in cart') {
-      return res.status(404).json({ message: error.message });
-    }
-    if (error instanceof Error && error.message === 'Ingredient not found') {
-      return res.status(404).json({ message: error.message });
-    }
-    throw error;
-  }
+  const extra = await addCartItemExtra(userId, cartItemId, req.body);
+  res.status(201).json(extra);
 };
 
 export const updateExtraInCartItem = async (req: Request, res: Response) => {
@@ -104,18 +79,11 @@ export const updateExtraInCartItem = async (req: Request, res: Response) => {
 
   req.log.info({ userId, cartItemId, ingredientId, body: req.body }, 'Updating extra in cart item');
 
-  try {
-    const extra = await updateCartItemExtra(userId, cartItemId, ingredientId, req.body);
-    res.json(extra);
-  } catch (error) {
-    if (error instanceof Error && error.message === 'Extra not found in cart item') {
-      return res.status(404).json({ message: error.message });
-    }
-    if (error instanceof Error && error.message === 'Item not found in cart') {
-      return res.status(404).json({ message: error.message });
-    }
-    throw error;
+  const extra = await updateCartItemExtra(userId, cartItemId, ingredientId, req.body);
+  if (!extra) {
+    return res.status(204).end();
   }
+  res.json(extra);
 };
 
 export const removeExtraFromCartItem = async (req: Request, res: Response) => {
@@ -126,5 +94,32 @@ export const removeExtraFromCartItem = async (req: Request, res: Response) => {
   req.log.info({ userId, cartItemId, ingredientId }, 'Removing extra from cart item');
 
   await removeCartItemExtra(userId, cartItemId, ingredientId);
+  res.status(204).end();
+};
+
+export const addIngredientToCart = async (req: Request, res: Response) => {
+  const userId = req.userId!;
+  req.log.info({ userId, body: req.body }, 'Adding ingredient item to cart');
+
+  const item = await addIngredientItemToCart(userId, req.body);
+  res.status(201).json(item);
+};
+
+export const updateIngredientItemHandler = async (req: Request, res: Response) => {
+  const userId = req.userId!;
+  const itemId = Number(req.params.itemId);
+  req.log.info({ userId, itemId, body: req.body }, 'Updating ingredient item');
+
+  const item = await updateIngredientItem(userId, itemId, req.body);
+  if (!item) return res.status(204).end();
+  res.json(item);
+};
+
+export const removeIngredientFromCart = async (req: Request, res: Response) => {
+  const userId = req.userId!;
+  const itemId = Number(req.params.itemId);
+  req.log.info({ userId, itemId }, 'Removing ingredient item from cart');
+
+  await removeIngredientItem(userId, itemId);
   res.status(204).end();
 };

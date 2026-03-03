@@ -35,12 +35,13 @@ model User {
 }
 
 model Cart {
-  id        Int        @id @default(autoincrement())
-  userId    Int        @unique
-  user      User       @relation(fields: [userId], references: [id])
-  items     CartItem[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id              Int                  @id @default(autoincrement())
+  userId          Int                  @unique
+  user            User                 @relation(fields: [userId], references: [id])
+  items           CartItem[]
+  ingredientItems CartIngredientItem[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 
   @@index([userId])
 }
@@ -61,16 +62,31 @@ model CartItem {
 }
 
 model CartItemExtra {
-  id           Int   @id @default(autoincrement())
+  id           Int        @id @default(autoincrement())
   cartItemId   Int
   ingredientId Int
-  quantity     Float @default(1.0)
+  quantity     Int        @default(1)
+  note         String?
+  cartItem     CartItem   @relation(fields: [cartItemId], references: [id], onDelete: Cascade)
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
 
-  cartItem   CartItem   @relation(fields: [cartItemId], references: [id], onDelete: Cascade)
+  @@unique([cartItemId, ingredientId, note])
+  @@index([cartItemId])
+}
+
+model CartIngredientItem {
+  id           Int     @id @default(autoincrement())
+  cartId       Int
+  ingredientId Int
+  quantity     Int     @default(1)
+  note         String?
+
+  cart       Cart       @relation(fields: [cartId], references: [id], onDelete: Cascade)
   ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
 
-  @@unique([cartItemId, ingredientId])
-  @@index([cartItemId])
+  @@unique([cartId, ingredientId, note])
+  @@index([cartId])
+  @@index([ingredientId])
 }
 
 enum Category {
@@ -82,7 +98,7 @@ model Dish {
   id          Int     @id @default(autoincrement())
   name        String
   description String?
-  price       Float
+  price       Decimal @db.Decimal(10, 2)
   imageUrl    String?
   calories    Int?
   protein     Float?
@@ -97,19 +113,20 @@ model Dish {
 }
 
 model Ingredient {
-  id    Int    @id @default(autoincrement())
+  id    Int     @id @default(autoincrement())
   name  String
-  price Float?
+  price Decimal @db.Decimal(10, 2)
 
-  dishes         DishIngredient[]
-  cartItemExtras CartItemExtra[]
+  dishes              DishIngredient[]
+  cartItemExtras      CartItemExtra[]
+  cartIngredientItems CartIngredientItem[]
 }
 
 model DishIngredient {
   dishId       Int
   ingredientId Int
   optional     Boolean @default(false)
-  quantity     Float   @default(1.0)
+  quantity     Int     @default(1)
 
   dish       Dish       @relation(fields: [dishId], references: [id], onDelete: Cascade)
   ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
@@ -142,7 +159,7 @@ model Order {
   userId        Int
   type          OrderType
   status        OrderStatus   @default(NEW)
-  total         Float
+  total         Decimal       @db.Decimal(10, 2)
   paymentStatus PaymentStatus @default(PENDING)
   comment       String?
   createdAt     DateTime      @default(now())

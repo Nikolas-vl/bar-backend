@@ -1,7 +1,14 @@
 import { ErrorRequestHandler } from 'express';
+import { AppError } from '../utils/errors';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
+  if (err instanceof AppError) {
+    return res.status(err.statusCode).json({
+      message: err.message,
+    });
+  }
+
   req.log.error(
     {
       err,
@@ -11,7 +18,7 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
     'Unhandled error',
   );
 
-  res.status(err.status || 500).json({
-    message: err.message || 'Internal server error',
+  res.status('status' in err && typeof err.status === 'number' ? err.status : 500).json({
+    message: 'Internal server error',
   });
 };

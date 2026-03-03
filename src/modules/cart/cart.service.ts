@@ -1,42 +1,66 @@
 import { prisma } from '../../prisma';
-import { CartItemInput, UpdateCartItemInput, CartItemExtraInput, UpdateCartItemExtraInput } from './cart.schema';
+
+import {
+  CartItemInput,
+  UpdateCartItemInput,
+  CartIngredientItemInput,
+  UpdateCartIngredientItemInput,
+  CartItemExtraInput,
+  UpdateCartItemExtraInput,
+} from './cart.schema';
+import { NotFoundError } from '../../utils/errors';
 
 const cartInclude = {
   items: {
     include: {
       dish: true,
-      extras: {
-        include: {
-          ingredient: true,
-        },
-      },
+      extras: { include: { ingredient: true } },
     },
+  },
+  ingredientItems: {
+    include: { ingredient: true },
   },
 };
 
 const cartItemInclude = {
   dish: true,
-  extras: {
-    include: {
-      ingredient: true,
-    },
-  },
+  extras: { include: { ingredient: true } },
+};
+
+const ingredientItemInclude = {
+  ingredient: true,
 };
 
 // --- Helpers ---
 
 const getOwnedCartItem = async (userId: number, cartItemId: number) => {
-  const cart = await getCartByUserId(userId);
-
   const cartItem = await prisma.cartItem.findFirst({
-    where: { id: cartItemId, cartId: cart.id },
+    where: {
+      id: cartItemId,
+      cart: { userId },
+    },
   });
 
   if (!cartItem) {
-    throw new Error('Item not found in cart');
+    throw new NotFoundError('Item not found in cart');
   }
 
   return cartItem;
+};
+
+const getOrCreateCart = (tx: { cart: typeof prisma.cart }, userId: number) =>
+  tx.cart.upsert({
+    where: { userId },
+    create: { userId },
+    update: {},
+  });
+
+const getOwnedIngredientItem = async (userId: number, itemId: number) => {
+  const item = await prisma.cartIngredientItem.findFirst({
+    where: { id: itemId, cart: { userId } },
+  });
+  if (!item) throw new NotFoundError('Ingredient item not found in cart');
+  return item;
 };
 
 const extrasMatch = (existing: { ingredientId: number; quantity: number }[], incoming: { ingredientId: number; quantity: number }[]) => {
@@ -64,37 +88,40 @@ export const getCartByUserId = (userId: number) => {
 export const addItemToCart = async (userId: number, input: CartItemInput) => {
   const dish = await prisma.dish.findUnique({ where: { id: input.dishId } });
   if (!dish) {
-    throw new Error('Dish not found');
+    throw new NotFoundError('Dish not found');
   }
 
-  const cart = await getCartByUserId(userId);
+  return prisma.$transaction(async tx => {
+    // Ensure cart exists inside the transaction
+    const cart = await getOrCreateCart(tx, userId);
 
-  const candidates = await prisma.cartItem.findMany({
-    where: { cartId: cart.id, dishId: input.dishId, note: input.note ?? null },
-    include: { extras: true },
-  });
+    const candidates = await tx.cartItem.findMany({
+      where: { cartId: cart.id, dishId: input.dishId, note: input.note ?? null },
+      include: { extras: true },
+    });
 
-  const match = candidates.find(c => extrasMatch(c.extras, input.extras));
+    const match = candidates.find(c => extrasMatch(c.extras, input.extras));
 
-  if (match) {
-    return prisma.cartItem.update({
-      where: { id: match.id },
-      data: { quantity: match.quantity + input.quantity },
+    if (match) {
+      return tx.cartItem.update({
+        where: { id: match.id },
+        data: { quantity: match.quantity + input.quantity },
+        include: cartItemInclude,
+      });
+    }
+
+    return tx.cartItem.create({
+      data: {
+        cartId: cart.id,
+        dishId: input.dishId,
+        quantity: input.quantity,
+        note: input.note,
+        extras: {
+          create: input.extras,
+        },
+      },
       include: cartItemInclude,
     });
-  }
-
-  return prisma.cartItem.create({
-    data: {
-      cartId: cart.id,
-      dishId: input.dishId,
-      quantity: input.quantity,
-      note: input.note,
-      extras: {
-        create: input.extras,
-      },
-    },
-    include: cartItemInclude,
   });
 };
 
@@ -108,7 +135,10 @@ export const updateCartItem = async (userId: number, cartItemId: number, input: 
 
   return prisma.cartItem.update({
     where: { id: cartItem.id },
-    data: { quantity: input.quantity },
+    data: {
+      ...(input.quantity !== undefined && { quantity: input.quantity }),
+      ...(input.note !== undefined && { note: input.note }),
+    },
     include: cartItemInclude,
   });
 };
@@ -120,40 +150,44 @@ export const removeItemFromCart = async (userId: number, cartItemId: number) => 
 };
 
 export const clearCart = async (userId: number) => {
-  const cart = await getCartByUserId(userId);
+  const cart = await prisma.cart.findUnique({ where: { userId } });
+  if (!cart) return;
 
-  return prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
+  await prisma.$transaction([
+    prisma.cartItem.deleteMany({ where: { cartId: cart.id } }),
+    prisma.cartIngredientItem.deleteMany({ where: { cartId: cart.id } }),
+  ]);
 };
 
-// --- Extras (post-creation editing) ---
+// --- Cart Item Extras ---
 
 export const addCartItemExtra = async (userId: number, cartItemId: number, input: CartItemExtraInput) => {
-  const ingredient = await prisma.ingredient.findUnique({ where: { id: input.ingredientId } });
-  if (!ingredient) {
-    throw new Error('Ingredient not found');
-  }
-
-  const cartItem = await getOwnedCartItem(userId, cartItemId);
-
-  const existingExtra = await prisma.cartItemExtra.findFirst({
-    where: { cartItemId: cartItem.id, ingredientId: input.ingredientId },
+  const cartItem = await prisma.cartItem.findFirst({
+    where: { id: cartItemId, cart: { userId } },
   });
+  if (!cartItem) throw new NotFoundError('Item not found in cart');
 
-  if (existingExtra) {
-    return prisma.cartItemExtra.update({
-      where: { id: existingExtra.id },
-      data: { quantity: existingExtra.quantity + input.quantity },
+  return prisma.$transaction(async tx => {
+    const existing = await tx.cartItemExtra.findFirst({
+      where: {
+        cartItemId: cartItem.id,
+        ingredientId: input.ingredientId,
+        note: input.note ?? null, // ← same ingredient + same note = merge
+      },
+    });
+
+    if (existing) {
+      return tx.cartItemExtra.update({
+        where: { id: existing.id },
+        data: { quantity: existing.quantity + input.quantity },
+        include: { ingredient: true },
+      });
+    }
+
+    return tx.cartItemExtra.create({
+      data: { cartItemId: cartItem.id, ...input },
       include: { ingredient: true },
     });
-  }
-
-  return prisma.cartItemExtra.create({
-    data: {
-      cartItemId: cartItem.id,
-      ingredientId: input.ingredientId,
-      quantity: input.quantity,
-    },
-    include: { ingredient: true },
   });
 };
 
@@ -163,10 +197,7 @@ export const updateCartItemExtra = async (userId: number, cartItemId: number, in
   const extra = await prisma.cartItemExtra.findFirst({
     where: { cartItemId: cartItem.id, ingredientId },
   });
-
-  if (!extra) {
-    throw new Error('Extra not found in cart item');
-  }
+  if (!extra) throw new NotFoundError('Extra not found in cart item');
 
   if (input.quantity === 0) {
     await prisma.cartItemExtra.delete({ where: { id: extra.id } });
@@ -175,7 +206,10 @@ export const updateCartItemExtra = async (userId: number, cartItemId: number, in
 
   return prisma.cartItemExtra.update({
     where: { id: extra.id },
-    data: { quantity: input.quantity },
+    data: {
+      ...(input.quantity !== undefined && { quantity: input.quantity }),
+      ...(input.note !== undefined && { note: input.note }), // ← add
+    },
     include: { ingredient: true },
   });
 };
@@ -186,4 +220,57 @@ export const removeCartItemExtra = async (userId: number, cartItemId: number, in
   return prisma.cartItemExtra.deleteMany({
     where: { cartItemId: cartItem.id, ingredientId },
   });
+};
+
+// --- Ingredient items ---
+
+export const addIngredientItemToCart = async (userId: number, input: CartIngredientItemInput) => {
+  const ingredient = await prisma.ingredient.findUnique({ where: { id: input.ingredientId } });
+  if (!ingredient) throw new NotFoundError('Ingredient not found');
+
+  return prisma.$transaction(async tx => {
+    const cart = await getOrCreateCart(tx, userId);
+
+    // merge if same ingredient + same note already in cart
+    const existing = await tx.cartIngredientItem.findFirst({
+      where: { cartId: cart.id, ingredientId: input.ingredientId, note: input.note ?? null },
+    });
+
+    if (existing) {
+      return tx.cartIngredientItem.update({
+        where: { id: existing.id },
+        data: { quantity: existing.quantity + input.quantity },
+        include: ingredientItemInclude,
+      });
+    }
+
+    return tx.cartIngredientItem.create({
+      data: { cartId: cart.id, ...input },
+      include: ingredientItemInclude,
+    });
+  });
+};
+
+export const updateIngredientItem = async (userId: number, itemId: number, input: UpdateCartIngredientItemInput) => {
+  const item = await getOwnedIngredientItem(userId, itemId);
+
+  if (input.quantity === 0) {
+    await prisma.cartIngredientItem.delete({ where: { id: item.id } });
+    return null;
+  }
+
+  return prisma.cartIngredientItem.update({
+    where: { id: item.id },
+    data: {
+      ...(input.quantity !== undefined && { quantity: input.quantity }),
+      ...(input.note !== undefined && { note: input.note }),
+    },
+    include: ingredientItemInclude,
+  });
+};
+
+export const removeIngredientItem = async (userId: number, itemId: number) => {
+  const item = await getOwnedIngredientItem(userId, itemId);
+
+  return prisma.cartIngredientItem.delete({ where: { id: item.id } });
 };
