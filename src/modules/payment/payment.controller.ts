@@ -18,9 +18,6 @@ export const getOne = async (req: Request, res: Response) => {
   const id = Number(req.params.id);
 
   const payment = await service.getPaymentMethodById(id, userId);
-
-  if (!payment) return res.status(404).json({ message: 'Not found' });
-
   res.json(payment);
 };
 

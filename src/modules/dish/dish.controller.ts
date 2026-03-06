@@ -23,12 +23,6 @@ export const getDish = async (req: Request, res: Response) => {
   req.log.info({ dishId: id }, 'Fetching dish');
 
   const dish = await getDishById(Number(id));
-
-  if (!dish) {
-    req.log.warn({ dishId: id }, 'Dish not found');
-    return res.status(404).json({ message: 'Dish not found' });
-  }
-
   res.json(dish);
 };
 

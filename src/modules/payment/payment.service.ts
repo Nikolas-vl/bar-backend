@@ -1,15 +1,8 @@
-import { Prisma } from '../../../generated/prisma/client';
 import prisma from '../../prisma';
+import { NotFoundError } from '../../utils/errors';
+import { CreatePaymentInput, UpdatePaymentInput } from './payment.schema';
 
-export const createPaymentMethod = async (
-  userId: number,
-  data: {
-    cardType: string;
-    last4: string;
-    expMonth: number;
-    expYear: number;
-  },
-) => {
+export const createPaymentMethod = async (userId: number, data: CreatePaymentInput) => {
   return prisma.paymentMethod.create({
     data: {
       ...data,
@@ -25,12 +18,14 @@ export const getUserPaymentMethods = async (userId: number) => {
 };
 
 export const getPaymentMethodById = async (id: number, userId: number) => {
-  return prisma.paymentMethod.findFirst({
+  const payment = await prisma.paymentMethod.findFirst({
     where: { id, userId },
   });
+  if (!payment) throw new NotFoundError('Payment method not found');
+  return payment;
 };
 
-export const updatePaymentMethod = async (id: number, userId: number, data: Prisma.PaymentMethodUpdateInput) => {
+export const updatePaymentMethod = async (id: number, userId: number, data: UpdatePaymentInput) => {
   return prisma.paymentMethod.updateMany({
     where: { id, userId },
     data,

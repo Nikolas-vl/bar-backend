@@ -1,3 +1,4 @@
+import type { Logger } from 'pino';
 import 'express-serve-static-core';
 
 interface OwnedResource {
@@ -9,7 +10,7 @@ declare module 'express-serve-static-core' {
   interface Request {
     userId?: number;
     role?: 'USER' | 'ADMIN';
-    log?: any;
+    log: Logger;
     resource?: OwnedResource;
   }
 }

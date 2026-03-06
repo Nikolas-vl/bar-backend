@@ -51,7 +51,7 @@ export const validate =
       next();
     } catch (error) {
       if (error instanceof z.ZodError) {
-        req.log?.warn?.({ issues: error.issues, url: req.url }, 'Request validation failed');
+        req.log.warn({ issues: error.issues, url: req.url }, 'Request validation failed');
         return res.status(400).json({
           message: 'Validation failed',
           issues: error.issues,

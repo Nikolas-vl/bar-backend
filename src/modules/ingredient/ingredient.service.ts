@@ -1,6 +1,7 @@
 import prisma from '../../prisma';
 import { Prisma } from '../../../generated/prisma/client';
 import { CreateIngredient, UpdateIngredient, IngredientQuery } from './ingredient.schema';
+import { NotFoundError } from '../../utils/errors';
 
 export const getAllIngredients = (query?: IngredientQuery) => {
   const { search, sortBy, sortOrder } = query || {};
@@ -32,8 +33,8 @@ export const getAllIngredients = (query?: IngredientQuery) => {
   });
 };
 
-export const getIngredientById = (id: number) => {
-  return prisma.ingredient.findUnique({
+export const getIngredientById = async (id: number) => {
+  const ingredient = await prisma.ingredient.findUnique({
     where: { id },
     include: {
       dishes: {
@@ -43,6 +44,8 @@ export const getIngredientById = (id: number) => {
       },
     },
   });
+  if (!ingredient) throw new NotFoundError('Ingredient not found');
+  return ingredient;
 };
 
 export const createIngredient = (data: CreateIngredient) => {

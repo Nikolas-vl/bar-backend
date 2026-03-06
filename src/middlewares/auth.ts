@@ -1,10 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyAccessToken } from '../modules/auth/jwt';
+import { verifyAccessToken } from '../utils/jwt';
+import { UnauthorizedError } from '../utils/errors';
 
 export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'No token' });
+    throw new UnauthorizedError('No token');
   }
 
   const token = header.split(' ')[1];
@@ -20,6 +21,6 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
 
     next();
   } catch {
-    return res.status(401).json({ message: 'Invalid token' });
+    throw new UnauthorizedError('Invalid token');
   }
 };

@@ -1,7 +1,7 @@
 import type { RequestHandler, Response, NextFunction } from 'express';
 import type { CorsRequest } from 'cors';
 
-export const asHandler = (handler: unknown) => handler as RequestHandler;
+const asHandler = (handler: unknown) => handler as RequestHandler;
 
 export const asCorsHandler =
   (handler: (req: CorsRequest, res: Response, next: NextFunction) => void): RequestHandler =>

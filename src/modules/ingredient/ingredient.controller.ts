@@ -20,12 +20,6 @@ export const getIngredient = async (req: Request, res: Response) => {
   req.log.info({ ingredientId: id }, 'Fetching ingredient');
 
   const ingredient = await getIngredientById(Number(id));
-
-  if (!ingredient) {
-    req.log.warn({ ingredientId: id }, 'Ingredient not found');
-    return res.status(404).json({ message: 'Ingredient not found' });
-  }
-
   res.json(ingredient);
 };
 

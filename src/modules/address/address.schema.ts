@@ -7,3 +7,6 @@ export const createAddressSchema = z.object({
 });
 
 export const updateAddressSchema = createAddressSchema.partial();
+
+export type CreateAddressInput = z.infer<typeof createAddressSchema>;
+export type UpdateAddressInput = z.infer<typeof updateAddressSchema>;

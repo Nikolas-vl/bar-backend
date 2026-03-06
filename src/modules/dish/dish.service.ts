@@ -2,6 +2,7 @@ import prisma from '../../prisma';
 import { Prisma } from '../../../generated/prisma/client';
 import { CreateDish, DishQuery, UpdateDish, AddIngredientToDish, UpdateDishIngredient } from './dish.schema';
 import { buildDishWhere } from './dish.utils';
+import { NotFoundError } from '../../utils/errors';
 
 const dishInclude = {
   ingredients: {
@@ -19,11 +20,13 @@ export const getAllDishes = (query?: DishQuery) => {
   });
 };
 
-export const getDishById = (id: number) => {
-  return prisma.dish.findUnique({
+export const getDishById = async (id: number) => {
+  const dish = await prisma.dish.findUnique({
     where: { id },
     include: dishInclude,
   });
+  if (!dish) throw new NotFoundError('Dish not found');
+  return dish;
 };
 
 export const createDish = (data: CreateDish) => {
