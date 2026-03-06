@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import * as service from './order.service';
-import { orderQuerySchema } from './order.schema';
+import { OrderQuery } from './order.schema';
 
 // ─── User ──────────────────────────────────────────────────────────────────
 
@@ -18,8 +18,7 @@ export const getMyOrders = async (req: Request, res: Response) => {
   const userId = req.userId!;
   req.log.info({ userId, query: req.query }, 'Fetching user orders');
 
-  const query = orderQuerySchema.parse(req.query);
-  const result = await service.getUserOrders(userId, query);
+  const result = await service.getUserOrders(userId, req.query as unknown as OrderQuery);
   res.json(result);
 };
 
@@ -59,8 +58,7 @@ export const payMyOrder = async (req: Request, res: Response) => {
 export const adminGetAllOrders = async (req: Request, res: Response) => {
   req.log.info({ query: req.query }, 'Admin fetching all orders');
 
-  const query = orderQuerySchema.parse(req.query);
-  const result = await service.getAllOrders(query);
+  const result = await service.getAllOrders(req.query as unknown as OrderQuery);
   res.json(result);
 };
 

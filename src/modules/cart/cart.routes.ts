@@ -38,6 +38,7 @@ router.post('/items/:cartItemId/extras', validate(cartItemExtraSchema), addExtra
 router.patch('/items/:cartItemId/extras/:ingredientId', validate(updateCartItemExtraSchema), updateExtraInCartItem);
 router.delete('/items/:cartItemId/extras/:ingredientId', removeExtraFromCartItem);
 
+// Extras in cart level
 router.post('/ingredients', validate(cartIngredientItemSchema), addIngredientToCart);
 router.patch('/ingredients/:itemId', validate(updateCartIngredientItemSchema), updateIngredientItemHandler);
 router.delete('/ingredients/:itemId', removeIngredientFromCart);

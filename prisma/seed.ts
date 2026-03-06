@@ -345,7 +345,7 @@ async function main() {
       type: OrderType.DELIVERY,
       status: OrderStatus.COMPLETED,
       total: 27.98,
-      paymentStatus: PaymentStatus.PAID,
+      paymentStatus: PaymentStatus.SUCCESS,
       comment: 'Please ring the doorbell',
       items: {
         create: [
@@ -362,7 +362,7 @@ async function main() {
       type: OrderType.DINE_IN,
       status: OrderStatus.PREPARING,
       total: 32.98,
-      paymentStatus: PaymentStatus.PAID,
+      paymentStatus: PaymentStatus.SUCCESS,
       items: {
         create: [
           { dishId: lunchDishes[2].id, quantity: 1 },
@@ -394,7 +394,7 @@ async function main() {
       type: OrderType.DELIVERY,
       status: OrderStatus.PAID,
       total: 45.97,
-      paymentStatus: PaymentStatus.PAID,
+      paymentStatus: PaymentStatus.SUCCESS,
       items: {
         create: [
           { dishId: lunchDishes[0].id, quantity: 2 },

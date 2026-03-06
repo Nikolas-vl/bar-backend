@@ -2,17 +2,17 @@ import { z } from 'zod';
 import { OrderType, OrderStatus, PaymentType } from '../../../generated/prisma/client';
 
 export const createOrderSchema = z.object({
-  type: z.nativeEnum(OrderType),
+  type: z.enum(OrderType),
   comment: z.string().max(1000).optional(),
 });
 
 export const updateOrderStatusSchema = z.object({
-  status: z.nativeEnum(OrderStatus),
+  status: z.enum(OrderStatus),
 });
 
 export const payOrderSchema = z
   .object({
-    type: z.nativeEnum(PaymentType),
+    type: z.enum(PaymentType),
     paymentMethodId: z.number().int().positive().optional(),
   })
   .refine(data => data.type !== PaymentType.CARD || data.paymentMethodId !== undefined, {
@@ -21,7 +21,7 @@ export const payOrderSchema = z
   });
 
 export const orderQuerySchema = z.object({
-  status: z.nativeEnum(OrderStatus).optional(),
+  status: z.enum(OrderStatus).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });

@@ -4,11 +4,12 @@ import { OrderStatus, PaymentStatus, PaymentType } from '../../../generated/pris
 import { NotFoundError, ValidationError } from '../../utils/errors';
 import { CreateOrderInput, UpdateOrderStatusInput, PayOrderInput, OrderQuery } from './order.schema';
 
-// ─── Includes ──────────────────────────────────────────────────────────────
-
 const orderInclude = {
   items: {
     include: { dish: true },
+  },
+  ingredientItems: {
+    include: { ingredient: true },
   },
   payments: true,
 };
@@ -44,7 +45,6 @@ export const createOrder = async (userId: number, input: CreateOrderInput) => {
         total = total.plus(new Decimal(extra.ingredient.price.toString()).times(extra.quantity));
       }
     }
-
     for (const ingItem of cart.ingredientItems) {
       total = total.plus(new Decimal(ingItem.ingredient.price.toString()).times(ingItem.quantity));
     }
@@ -61,6 +61,13 @@ export const createOrder = async (userId: number, input: CreateOrderInput) => {
           create: cart.items.map(item => ({
             dishId: item.dishId,
             quantity: item.quantity,
+          })),
+        },
+        ingredientItems: {
+          create: cart.ingredientItems.map(item => ({
+            ingredientId: item.ingredientId,
+            quantity: item.quantity,
+            note: item.note,
           })),
         },
       },
@@ -234,5 +241,10 @@ export const deleteOrder = async (orderId: number) => {
 
   if (!order) throw new NotFoundError('Order not found');
 
-  return prisma.order.delete({ where: { id: orderId } });
+  return prisma.$transaction(async tx => {
+    await tx.payment.deleteMany({ where: { orderId } });
+    await tx.orderIngredientItem.deleteMany({ where: { orderId } });
+    await tx.orderItem.deleteMany({ where: { orderId } });
+    return tx.order.delete({ where: { id: orderId } });
+  });
 };

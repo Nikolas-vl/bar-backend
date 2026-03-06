@@ -118,9 +118,10 @@ model Ingredient {
   name  String
   price Decimal @db.Decimal(10, 2)
 
-  dishes              DishIngredient[]
-  cartItemExtras      CartItemExtra[]
-  cartIngredientItems CartIngredientItem[]
+  dishes               DishIngredient[]
+  cartItemExtras       CartItemExtra[]
+  cartIngredientItems  CartIngredientItem[]
+  orderIngredientItems OrderIngredientItem[]
 }
 
 model DishIngredient {
@@ -165,9 +166,10 @@ model Order {
   comment       String?
   createdAt     DateTime      @default(now())
 
-  user     User        @relation(fields: [userId], references: [id])
-  items    OrderItem[]
-  payments Payment[]
+  user            User                  @relation(fields: [userId], references: [id])
+  items           OrderItem[]
+  ingredientItems OrderIngredientItem[]
+  payments        Payment[]
 
   @@index([userId])
   @@index([status])
@@ -185,6 +187,20 @@ model OrderItem {
 
   @@index([orderId])
   @@index([dishId])
+}
+
+model OrderIngredientItem {
+  id           Int     @id @default(autoincrement())
+  orderId      Int
+  ingredientId Int
+  quantity     Int     @default(1)
+  note         String?
+
+  order      Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([ingredientId])
 }
 
 enum ReservationStatus {
