@@ -1,6 +1,7 @@
-import { Request, Response } from 'express';
 import * as service from './order.service';
-import { OrderQuery } from './order.schema';
+import { orderQuerySchema } from './order.schema';
+import { paramSchema } from '../../utils/common.schema';
+import { Request, Response } from 'express';
 
 // ─── User ──────────────────────────────────────────────────────────────────
 
@@ -16,15 +17,16 @@ export const createOrder = async (req: Request, res: Response) => {
 
 export const getMyOrders = async (req: Request, res: Response) => {
   const userId = req.userId!;
-  req.log.info({ userId, query: req.query }, 'Fetching user orders');
+  const query = orderQuerySchema.parse(req.query);
+  req.log.info({ userId, query }, 'Fetching user orders');
 
-  const result = await service.getUserOrders(userId, req.query as unknown as OrderQuery);
+  const result = await service.getUserOrders(userId, query);
   res.json(result);
 };
 
 export const getMyOrderById = async (req: Request, res: Response) => {
   const userId = req.userId!;
-  const orderId = Number(req.params.orderId);
+  const { orderId } = paramSchema('orderId').parse(req.params);
   req.log.info({ userId, orderId }, 'Fetching order');
 
   const order = await service.getUserOrderById(userId, orderId);
@@ -33,7 +35,7 @@ export const getMyOrderById = async (req: Request, res: Response) => {
 
 export const cancelMyOrder = async (req: Request, res: Response) => {
   const userId = req.userId!;
-  const orderId = Number(req.params.orderId);
+  const { orderId } = paramSchema('orderId').parse(req.params);
   req.log.info({ userId, orderId }, 'Cancelling order');
 
   const order = await service.cancelOrder(userId, orderId);
@@ -44,7 +46,7 @@ export const cancelMyOrder = async (req: Request, res: Response) => {
 
 export const payMyOrder = async (req: Request, res: Response) => {
   const userId = req.userId!;
-  const orderId = Number(req.params.orderId);
+  const { orderId } = paramSchema('orderId').parse(req.params);
   req.log.info({ userId, orderId, body: req.body }, 'Processing payment');
 
   const result = await service.payOrder(userId, orderId, req.body);
@@ -56,14 +58,15 @@ export const payMyOrder = async (req: Request, res: Response) => {
 // ─── Admin ─────────────────────────────────────────────────────────────────
 
 export const adminGetAllOrders = async (req: Request, res: Response) => {
-  req.log.info({ query: req.query }, 'Admin fetching all orders');
+  const query = orderQuerySchema.parse(req.query);
+  req.log.info({ query }, 'Admin fetching all orders');
 
-  const result = await service.getAllOrders(req.query as unknown as OrderQuery);
+  const result = await service.getAllOrders(query);
   res.json(result);
 };
 
 export const adminGetOrderById = async (req: Request, res: Response) => {
-  const orderId = Number(req.params.orderId);
+  const { orderId } = paramSchema('orderId').parse(req.params);
   req.log.info({ orderId }, 'Admin fetching order');
 
   const order = await service.getOrderById(orderId);
@@ -71,7 +74,7 @@ export const adminGetOrderById = async (req: Request, res: Response) => {
 };
 
 export const adminUpdateOrderStatus = async (req: Request, res: Response) => {
-  const orderId = Number(req.params.orderId);
+  const { orderId } = paramSchema('orderId').parse(req.params);
   req.log.info({ orderId, body: req.body }, 'Admin updating order status');
 
   const order = await service.updateOrderStatus(orderId, req.body);
@@ -81,7 +84,7 @@ export const adminUpdateOrderStatus = async (req: Request, res: Response) => {
 };
 
 export const adminDeleteOrder = async (req: Request, res: Response) => {
-  const orderId = Number(req.params.orderId);
+  const { orderId } = paramSchema('orderId').parse(req.params);
   req.log.info({ orderId }, 'Admin deleting order');
 
   await service.deleteOrder(orderId);

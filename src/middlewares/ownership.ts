@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { getAddressById } from '../modules/address/address.service';
 import { ForbiddenError } from '../utils/errors';
+import { paramSchema } from '../utils/common.schema';
 
 type EntityWithUserId = {
   id: number;
@@ -23,4 +24,7 @@ export const ownsResource =
     next();
   };
 
-export const ownsAddress = ownsResource(req => getAddressById(+req.params.id));
+export const ownsAddress = ownsResource(req => {
+  const { id } = paramSchema('id').parse(req.params);
+  return getAddressById(id);
+});

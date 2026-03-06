@@ -12,6 +12,7 @@ import {
   addCartItemExtra,
   removeCartItemExtra,
 } from './cart.service';
+import { paramSchema } from '../../utils/common.schema';
 
 export const getCart = async (req: Request, res: Response) => {
   const userId = req.userId!;
@@ -31,7 +32,7 @@ export const addToCart = async (req: Request, res: Response) => {
 
 export const updateCartItemHandler = async (req: Request, res: Response) => {
   const userId = req.userId!;
-  const cartItemId = Number(req.params.cartItemId);
+  const { cartItemId } = paramSchema('cartItemId').parse(req.params);
 
   req.log.info({ userId, cartItemId, body: req.body }, 'Updating cart item');
 
@@ -44,7 +45,7 @@ export const updateCartItemHandler = async (req: Request, res: Response) => {
 
 export const removeFromCart = async (req: Request, res: Response) => {
   const userId = req.userId!;
-  const cartItemId = Number(req.params.cartItemId);
+  const { cartItemId } = paramSchema('cartItemId').parse(req.params);
 
   req.log.info({ userId, cartItemId }, 'Removing item from cart');
 
@@ -64,7 +65,7 @@ export const clearCart = async (req: Request, res: Response) => {
 
 export const addExtraToCartItem = async (req: Request, res: Response) => {
   const userId = req.userId!;
-  const cartItemId = Number(req.params.cartItemId);
+  const { cartItemId } = paramSchema('cartItemId').parse(req.params);
 
   req.log.info({ userId, cartItemId, body: req.body }, 'Adding extra to cart item');
 
@@ -74,8 +75,7 @@ export const addExtraToCartItem = async (req: Request, res: Response) => {
 
 export const updateExtraInCartItem = async (req: Request, res: Response) => {
   const userId = req.userId!;
-  const cartItemId = Number(req.params.cartItemId);
-  const ingredientId = Number(req.params.ingredientId);
+  const { cartItemId, ingredientId } = paramSchema('cartItemId', 'ingredientId').parse(req.params);
 
   req.log.info({ userId, cartItemId, ingredientId, body: req.body }, 'Updating extra in cart item');
 
@@ -88,8 +88,7 @@ export const updateExtraInCartItem = async (req: Request, res: Response) => {
 
 export const removeExtraFromCartItem = async (req: Request, res: Response) => {
   const userId = req.userId!;
-  const cartItemId = Number(req.params.cartItemId);
-  const ingredientId = Number(req.params.ingredientId);
+  const { cartItemId, ingredientId } = paramSchema('cartItemId', 'ingredientId').parse(req.params);
 
   req.log.info({ userId, cartItemId, ingredientId }, 'Removing extra from cart item');
 
@@ -107,7 +106,7 @@ export const addIngredientToCart = async (req: Request, res: Response) => {
 
 export const updateIngredientItemHandler = async (req: Request, res: Response) => {
   const userId = req.userId!;
-  const itemId = Number(req.params.itemId);
+  const { itemId } = paramSchema('itemId').parse(req.params);
   req.log.info({ userId, itemId, body: req.body }, 'Updating ingredient item');
 
   const item = await updateIngredientItem(userId, itemId, req.body);
@@ -117,7 +116,7 @@ export const updateIngredientItemHandler = async (req: Request, res: Response) =
 
 export const removeIngredientFromCart = async (req: Request, res: Response) => {
   const userId = req.userId!;
-  const itemId = Number(req.params.itemId);
+  const { itemId } = paramSchema('itemId').parse(req.params);
   req.log.info({ userId, itemId }, 'Removing ingredient item from cart');
 
   await removeIngredientItem(userId, itemId);
