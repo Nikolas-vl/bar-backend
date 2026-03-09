@@ -106,11 +106,12 @@ model Dish {
   fat         Float?
   carbs       Float?
 
-  category    Category         @default(BREAKFAST)
-  isAvailable Boolean          @default(true)
-  ingredients DishIngredient[]
-  orderItems  OrderItem[]
-  cartItems   CartItem[]
+  category             Category              @default(BREAKFAST)
+  isAvailable          Boolean               @default(true)
+  ingredients          DishIngredient[]
+  orderItems           OrderItem[]
+  cartItems            CartItem[]
+  reservationPreOrders ReservationPreOrder[]
 }
 
 model Ingredient {
@@ -161,10 +162,16 @@ model Order {
   userId        Int
   type          OrderType
   status        OrderStatus   @default(NEW)
+  subtotal      Decimal       @db.Decimal(10, 2)
+  discount      Decimal       @default(0) @db.Decimal(10, 2)
+  tax           Decimal       @db.Decimal(10, 2)
+  deliveryFee   Decimal       @db.Decimal(10, 2)
+  serviceFee    Decimal       @db.Decimal(10, 2)
   total         Decimal       @db.Decimal(10, 2)
   paymentStatus PaymentStatus @default(PENDING)
   comment       String?
   createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   user            User                  @relation(fields: [userId], references: [id])
   items           OrderItem[]
@@ -203,6 +210,13 @@ model OrderIngredientItem {
   @@index([ingredientId])
 }
 
+model Table {
+  id           Int           @id @default(autoincrement())
+  number       Int           @unique
+  capacity     Int
+  reservations Reservation[]
+}
+
 enum ReservationStatus {
   PENDING
   CONFIRMED
@@ -210,15 +224,37 @@ enum ReservationStatus {
 }
 
 model Reservation {
-  id     Int               @id @default(autoincrement())
-  userId Int
-  date   DateTime
-  guests Int
-  user   User              @relation(fields: [userId], references: [id])
-  status ReservationStatus @default(PENDING)
+  id        Int               @id @default(autoincrement())
+  userId    Int
+  tableId   Int?
+  date      DateTime
+  guests    Int
+  status    ReservationStatus @default(PENDING)
+  comment   String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 
-  @@index([date])
+  user      User                  @relation(fields: [userId], references: [id])
+  table     Table?                @relation(fields: [tableId], references: [id])
+  preOrders ReservationPreOrder[]
+
   @@index([userId])
+  @@index([date])
+  @@index([status])
+  @@index([tableId])
+}
+
+model ReservationPreOrder {
+  id            Int @id @default(autoincrement())
+  reservationId Int
+  dishId        Int
+  quantity      Int @default(1)
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  dish        Dish        @relation(fields: [dishId], references: [id], onDelete: Restrict)
+
+  @@unique([reservationId, dishId])
+  @@index([reservationId])
 }
 
 model Address {

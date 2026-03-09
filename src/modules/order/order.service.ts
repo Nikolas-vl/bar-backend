@@ -3,6 +3,7 @@ import prisma from '../../prisma';
 import { OrderStatus, PaymentStatus, PaymentType } from '../../../generated/prisma/client';
 import { NotFoundError, ValidationError } from '../../utils/errors';
 import { CreateOrderInput, UpdateOrderStatusInput, PayOrderInput, OrderQuery } from './order.schema';
+import { calcFinalTotal } from '../../utils/pricing';
 
 const orderInclude = {
   items: {
@@ -37,24 +38,31 @@ export const createOrder = async (userId: number, input: CreateOrderInput) => {
       throw new ValidationError('Cart is empty');
     }
 
-    let total = new Decimal(0);
+    let subtotal = new Decimal(0);
 
     for (const item of cart.items) {
-      total = total.plus(new Decimal(item.dish.price.toString()).times(item.quantity));
+      subtotal = subtotal.plus(new Decimal(item.dish.price.toString()).times(item.quantity));
       for (const extra of item.extras) {
-        total = total.plus(new Decimal(extra.ingredient.price.toString()).times(extra.quantity));
+        subtotal = subtotal.plus(new Decimal(extra.ingredient.price.toString()).times(extra.quantity));
       }
     }
     for (const ingItem of cart.ingredientItems) {
-      total = total.plus(new Decimal(ingItem.ingredient.price.toString()).times(ingItem.quantity));
+      subtotal = subtotal.plus(new Decimal(ingItem.ingredient.price.toString()).times(ingItem.quantity));
     }
+
+    const pricing = calcFinalTotal(subtotal, input.discountPercent);
 
     const order = await tx.order.create({
       data: {
         userId,
         type: input.type,
         comment: input.comment,
-        total,
+        subtotal: pricing.subtotal,
+        discount: pricing.discount,
+        tax: pricing.tax,
+        deliveryFee: pricing.deliveryFee,
+        serviceFee: pricing.serviceFee,
+        total: pricing.total,
         status: OrderStatus.NEW,
         paymentStatus: PaymentStatus.PENDING,
         items: {
