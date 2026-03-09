@@ -339,12 +339,17 @@ async function main() {
   console.log('✅ Created payment methods');
 
   // Create Orders with OrderItems
-  const order1 = await prisma.order.create({
+const order1 = await prisma.order.create({
     data: {
       userId: user1.id,
       type: OrderType.DELIVERY,
       status: OrderStatus.COMPLETED,
-      total: 27.98,
+      subtotal: 27.97,
+      discount: 0,
+      tax: 6.43,
+      deliveryFee: 0,
+      serviceFee: 2.00,
+      total: 36.40,
       paymentStatus: PaymentStatus.SUCCESS,
       comment: 'Please ring the doorbell',
       items: {
@@ -361,7 +366,12 @@ async function main() {
       userId: user2.id,
       type: OrderType.DINE_IN,
       status: OrderStatus.PREPARING,
-      total: 32.98,
+      subtotal: 32.98,
+      discount: 0,
+      tax: 7.59,
+      deliveryFee: 5.00,
+      serviceFee: 2.00,
+      total: 47.57,
       paymentStatus: PaymentStatus.SUCCESS,
       items: {
         create: [
@@ -377,7 +387,12 @@ async function main() {
       userId: user3.id,
       type: OrderType.TAKE_OUT,
       status: OrderStatus.NEW,
-      total: 14.99,
+      subtotal: 14.99,
+      discount: 0,
+      tax: 3.45,
+      deliveryFee: 5.00,
+      serviceFee: 2.00,
+      total: 25.44,
       paymentStatus: PaymentStatus.PENDING,
       comment: 'Extra sauce please',
       items: {
@@ -393,7 +408,12 @@ async function main() {
       userId: user1.id,
       type: OrderType.DELIVERY,
       status: OrderStatus.PAID,
-      total: 45.97,
+      subtotal: 44.97,
+      discount: 0,
+      tax: 10.34,
+      deliveryFee: 5.00,
+      serviceFee: 2.00,
+      total: 62.31,
       paymentStatus: PaymentStatus.SUCCESS,
       items: {
         create: [

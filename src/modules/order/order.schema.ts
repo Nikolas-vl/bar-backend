@@ -4,6 +4,7 @@ import { OrderType, OrderStatus, PaymentType } from '../../../generated/prisma/c
 export const createOrderSchema = z.object({
   type: z.enum(OrderType),
   comment: z.string().max(1000).optional(),
+  discountPercent: z.number().min(0).max(100).default(0),
 });
 
 export const updateOrderStatusSchema = z.object({
