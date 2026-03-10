@@ -12,7 +12,7 @@ import { authLimiter, apiLimiter } from './middlewares/rateLimiter';
 const app = express();
 
 const corsMiddleware = cors({
-  origin: 'http://localhost:4000',
+  origin: 'http://localhost:3000',
   credentials: true,
 });
 
