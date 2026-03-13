@@ -9,6 +9,7 @@ import {
   UpdateCartItemExtraInput,
 } from './cart.schema';
 import { NotFoundError } from '../../utils/errors';
+import { assertIngredientAllowed, getOwnedCartItem, getOrCreateCart, getOwnedIngredientItem, extrasMatch } from '../../utils/cartHelpers';
 
 const cartInclude = {
   items: {
@@ -29,49 +30,6 @@ const cartItemInclude = {
 
 const ingredientItemInclude = {
   ingredient: true,
-};
-
-// --- Helpers ---
-
-const getOwnedCartItem = async (userId: number, cartItemId: number) => {
-  const cartItem = await prisma.cartItem.findFirst({
-    where: {
-      id: cartItemId,
-      cart: { userId },
-    },
-  });
-
-  if (!cartItem) {
-    throw new NotFoundError('Item not found in cart');
-  }
-
-  return cartItem;
-};
-
-const getOrCreateCart = (tx: { cart: typeof prisma.cart }, userId: number) =>
-  tx.cart.upsert({
-    where: { userId },
-    create: { userId },
-    update: {},
-  });
-
-const getOwnedIngredientItem = async (userId: number, itemId: number) => {
-  const item = await prisma.cartIngredientItem.findFirst({
-    where: { id: itemId, cart: { userId } },
-  });
-  if (!item) throw new NotFoundError('Ingredient item not found in cart');
-  return item;
-};
-
-const extrasMatch = (existing: { ingredientId: number; quantity: number }[], incoming: { ingredientId: number; quantity: number }[]) => {
-  if (existing.length !== incoming.length) return false;
-
-  const normalize = (extras: { ingredientId: number; quantity: number }[]) => [...extras].sort((a, b) => a.ingredientId - b.ingredientId);
-
-  const a = normalize(existing);
-  const b = normalize(incoming);
-
-  return a.every((e, i) => e.ingredientId === b[i].ingredientId && e.quantity === b[i].quantity);
 };
 
 // --- Cart ---
@@ -162,12 +120,11 @@ export const clearCart = async (userId: number) => {
 // --- Cart Item Extras ---
 
 export const addCartItemExtra = async (userId: number, cartItemId: number, input: CartItemExtraInput) => {
-  const cartItem = await prisma.cartItem.findFirst({
-    where: { id: cartItemId, cart: { userId } },
-  });
-  if (!cartItem) throw new NotFoundError('Item not found in cart');
+  const cartItem = await getOwnedCartItem(userId, cartItemId);
 
   return prisma.$transaction(async tx => {
+    await assertIngredientAllowed(tx, cartItem.dishId, input.ingredientId);
+
     const existing = await tx.cartItemExtra.findFirst({
       where: {
         cartItemId: cartItem.id,
