@@ -7,20 +7,20 @@ import routes from './routes';
 import { logger } from './utils/logger';
 import { errorHandler } from './middlewares/errorHandler';
 import { asCorsHandler, useHandlers } from './utils/express';
-import { authLimiter, apiLimiter } from './middlewares/rateLimiter';
+// import { authLimiter, apiLimiter } from './middlewares/rateLimiter';
 
 const app = express();
 
 const corsMiddleware = cors({
-  origin: 'http://localhost:4000',
+  origin: 'http://localhost:3000',
   credentials: true,
 });
 
 app.use(helmet());
 app.use(asCorsHandler(corsMiddleware));
 
-app.use('/api/auth', authLimiter);
-app.use('/api', apiLimiter);
+// app.use('/api/auth', authLimiter);
+// app.use('/api', apiLimiter);
 
 const httpLogger = pinoHttp({ logger });
 useHandlers(app, httpLogger, express.json(), cookieParser());

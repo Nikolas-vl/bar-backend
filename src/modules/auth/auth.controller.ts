@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
-import { registerUser, loginUser, refreshSession, findUserByRefreshToken, updateRefreshToken } from './auth.service';
+import { registerUser, loginUser, refreshSession, updateRefreshToken } from './auth.service';
 import { UnauthorizedError } from '../../utils/errors';
+import { verifyRefreshToken } from '../../utils/jwt';
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -9,24 +10,26 @@ const REFRESH_COOKIE_OPTIONS = {
   secure: isProd,
   sameSite: isProd ? ('strict' as const) : ('lax' as const),
   maxAge: 7 * 24 * 60 * 60 * 1000,
+  path: '/api/auth/refresh',
 };
 
 export const register = async (req: Request, res: Response) => {
   req.log.info({ email: req.body.email }, 'Register attempt');
 
-  const user = await registerUser(req.body);
+  const { user, accessToken, refreshToken } = await registerUser(req.body);
 
   req.log.info({ userId: user.id }, 'User registered');
-  res.status(201).json(user);
+  res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
+  res.status(201).json({ user, accessToken });
 };
 
 export const login = async (req: Request, res: Response) => {
   req.log.info({ email: req.body.email }, 'Login attempt');
 
-  const { accessToken, refreshToken } = await loginUser(req.body);
+  const { user, accessToken, refreshToken } = await loginUser(req.body);
 
   res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
-  res.json({ accessToken });
+  res.json({ user, accessToken });
 };
 
 export const refresh = async (req: Request, res: Response) => {
@@ -50,18 +53,18 @@ export const logout = async (req: Request, res: Response) => {
   const refreshToken = req.cookies.refreshToken;
 
   if (refreshToken) {
-    const user = await findUserByRefreshToken(refreshToken);
-    if (user) {
-      await updateRefreshToken(user.id, null);
-      req.log.info({ userId: user.id }, 'User logged out');
+    try {
+      const payload = verifyRefreshToken(refreshToken) as { userId: number };
+
+      await updateRefreshToken(payload.userId, null);
+
+      req.log.info({ userId: payload.userId }, 'User logged out');
+    } catch {
+      req.log.warn('Invalid refresh token during logout');
     }
   }
 
-  res.clearCookie('refreshToken', {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? 'strict' : 'none',
-  });
+  res.clearCookie('refreshToken', REFRESH_COOKIE_OPTIONS);
 
   res.json({ message: 'User successfully logged out' });
 };
