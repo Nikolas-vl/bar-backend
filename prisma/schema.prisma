@@ -123,6 +123,7 @@ model Ingredient {
   cartItemExtras       CartItemExtra[]
   cartIngredientItems  CartIngredientItem[]
   orderIngredientItems OrderIngredientItem[]
+  orderItemExtras      OrderItemExtra[]
 }
 
 model DishIngredient {
@@ -184,16 +185,31 @@ model Order {
 }
 
 model OrderItem {
-  id       Int @id @default(autoincrement())
+  id       Int     @id @default(autoincrement())
   orderId  Int
   dishId   Int
-  quantity Int @default(1)
+  quantity Int     @default(1)
+  note     String?
 
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  dish  Dish  @relation(fields: [dishId], references: [id], onDelete: Restrict)
+  order  Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  dish   Dish             @relation(fields: [dishId], references: [id], onDelete: Restrict)
+  extras OrderItemExtra[]
 
   @@index([orderId])
   @@index([dishId])
+}
+
+model OrderItemExtra {
+  id           Int @id @default(autoincrement())
+  orderItemId  Int
+  ingredientId Int
+  quantity     Int @default(1)
+
+  orderItem  OrderItem  @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@index([orderItemId])
+  @@index([ingredientId])
 }
 
 model OrderIngredientItem {

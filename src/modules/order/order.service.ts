@@ -7,7 +7,10 @@ import { calcFinalTotal } from '../../utils/pricing';
 
 const orderInclude = {
   items: {
-    include: { dish: true },
+    include: {
+      dish: true,
+      extras: { include: { ingredient: true } },
+    },
   },
   ingredientItems: {
     include: { ingredient: true },
@@ -69,6 +72,13 @@ export const createOrder = async (userId: number, input: CreateOrderInput) => {
           create: cart.items.map(item => ({
             dishId: item.dishId,
             quantity: item.quantity,
+            note: item.note,
+            extras: {
+              create: item.extras.map(e => ({
+                ingredientId: e.ingredientId,
+                quantity: e.quantity,
+              })),
+            },
           })),
         },
         ingredientItems: {
