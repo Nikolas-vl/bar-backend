@@ -41,6 +41,20 @@ export const createOrder = async (userId: number, input: CreateOrderInput) => {
       throw new ValidationError('Cart is empty');
     }
 
+    const dishIds = cart.items.map(i => i.dishId);
+
+    const unavailable = await tx.dish.findMany({
+      where: {
+        id: { in: dishIds },
+        isAvailable: false,
+      },
+      select: { name: true },
+    });
+
+    if (unavailable.length > 0) {
+      throw new ValidationError(`Cannot place order. The following dishes are currently unavailable: ${unavailable.map(d => d.name).join(', ')}`);
+    }
+
     let subtotal = new Decimal(0);
 
     for (const item of cart.items) {
