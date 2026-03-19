@@ -151,7 +151,11 @@ export const cancelOrder = async (userId: number, orderId: number) => {
 
   if (!order) throw new NotFoundError('Order not found');
 
-  if (order.status !== OrderStatus.NEW) {
+  if (order.status === OrderStatus.CANCELED) {
+    throw new ValidationError('Order is already canceled');
+  }
+
+  if (order.status === OrderStatus.PREPARING || order.status === OrderStatus.COMPLETED) {
     throw new ValidationError(`Cannot cancel an order with status: ${order.status}`);
   }
 
@@ -184,8 +188,23 @@ export const payOrder = async (userId: number, orderId: number, input: PayOrderI
     if (!method) throw new NotFoundError('Payment method not found');
   }
 
-  // Simulate: BLIK has a small random failure rate
-  const simulatedStatus = input.type === PaymentType.BLIK && Math.random() < 0.1 ? PaymentStatus.FAILED : PaymentStatus.SUCCESS;
+  // ─── Payment simulation per type ──────────────────────────────────────
+  //
+  // CASH   → physical payment at the counter; the order stays NEW + PENDING
+  //          until a staff member marks it paid via the admin panel.
+  //          We still record the payment intent so staff can see the method.
+  //
+  // BLIK   → online payment; simulate a 10 % random failure rate.
+  //
+  // CARD   → online payment with a saved card; always succeeds in simulation.
+  // ──────────────────────────────────────────────────────────────────────
+  const isCash = input.type === PaymentType.CASH;
+
+  const simulatedStatus: PaymentStatus = isCash
+    ? PaymentStatus.PENDING // settled physically later
+    : input.type === PaymentType.BLIK && Math.random() < 0.1
+      ? PaymentStatus.FAILED // BLIK 10 % failure
+      : PaymentStatus.SUCCESS; // CARD always succeeds
 
   return prisma.$transaction(async tx => {
     const payment = await tx.payment.create({
@@ -199,6 +218,8 @@ export const payOrder = async (userId: number, orderId: number, input: PayOrderI
       },
     });
 
+    // Only update order status for successful online payments.
+    // CASH orders stay NEW + PENDING — staff confirms them via admin panel.
     if (simulatedStatus === PaymentStatus.SUCCESS) {
       await tx.order.update({
         where: { id: orderId },
@@ -209,10 +230,16 @@ export const payOrder = async (userId: number, orderId: number, input: PayOrderI
       });
     }
 
+    const isCashPayment = input.type === PaymentType.CASH;
+
     return {
       payment,
-      success: simulatedStatus === PaymentStatus.SUCCESS,
-      message: simulatedStatus === PaymentStatus.SUCCESS ? 'Payment successful' : 'Payment failed. Please try again.',
+      success: isCashPayment || simulatedStatus === PaymentStatus.SUCCESS,
+      message: isCashPayment
+        ? 'Order placed. Please pay at the counter.'
+        : simulatedStatus === PaymentStatus.SUCCESS
+          ? 'Payment successful'
+          : 'Payment failed. Please try again.',
     };
   });
 };
