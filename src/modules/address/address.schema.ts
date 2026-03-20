@@ -2,9 +2,9 @@ import { z } from 'zod';
 
 export const createAddressSchema = z
   .object({
-    city: z.string(),
-    street: z.string(),
-    zip: z.string(),
+    city: z.string().min(1, 'City is required'),
+    street: z.string().min(1, 'Street is required'),
+    zip: z.string().min(1, 'ZIP is required'),
   })
   .strict();
 

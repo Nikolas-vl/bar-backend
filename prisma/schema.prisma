@@ -22,6 +22,7 @@ model User {
   id           Int      @id @default(autoincrement())
   email        String   @unique
   password     String
+  phone        String   @unique
   name         String?
   createdAt    DateTime @default(now())
   role         UserRole @default(USER)
@@ -284,7 +285,6 @@ model Address {
   city      String
   street    String
   zip       String
-  phone     String  @default("000000000")
   user      User    @relation(fields: [userId], references: [id])
   isDefault Boolean @default(false)
 
