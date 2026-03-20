@@ -15,13 +15,32 @@ const orderInclude = {
   ingredientItems: {
     include: { ingredient: true },
   },
-  payments: true,
-};
-
-// ─── User ──────────────────────────────────────────────────────────────────
+  address: true,
+  payments: {
+    include: {
+      paymentMethod: {
+        select: {
+          id: true,
+          cardType: true,
+          last4: true,
+          expMonth: true,
+          expYear: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' as const },
+  },
+} as const;
 
 export const createOrder = async (userId: number, input: CreateOrderInput) => {
   return prisma.$transaction(async tx => {
+    if (input.type === 'DELIVERY' && input.addressId) {
+      const addr = await tx.address.findFirst({
+        where: { id: input.addressId, userId },
+      });
+      if (!addr) throw new ValidationError('Delivery address not found or does not belong to you');
+    }
+
     const cart = await tx.cart.findUnique({
       where: { userId },
       include: {
@@ -42,12 +61,8 @@ export const createOrder = async (userId: number, input: CreateOrderInput) => {
     }
 
     const dishIds = cart.items.map(i => i.dishId);
-
     const unavailable = await tx.dish.findMany({
-      where: {
-        id: { in: dishIds },
-        isAvailable: false,
-      },
+      where: { id: { in: dishIds }, isAvailable: false },
       select: { name: true },
     });
 
@@ -72,6 +87,7 @@ export const createOrder = async (userId: number, input: CreateOrderInput) => {
     const order = await tx.order.create({
       data: {
         userId,
+        addressId: input.type === 'DELIVERY' ? (input.addressId ?? null) : null,
         type: input.type,
         comment: input.comment,
         subtotal: pricing.subtotal,
@@ -188,23 +204,13 @@ export const payOrder = async (userId: number, orderId: number, input: PayOrderI
     if (!method) throw new NotFoundError('Payment method not found');
   }
 
-  // ─── Payment simulation per type ──────────────────────────────────────
-  //
-  // CASH   → physical payment at the counter; the order stays NEW + PENDING
-  //          until a staff member marks it paid via the admin panel.
-  //          We still record the payment intent so staff can see the method.
-  //
-  // BLIK   → online payment; simulate a 10 % random failure rate.
-  //
-  // CARD   → online payment with a saved card; always succeeds in simulation.
-  // ──────────────────────────────────────────────────────────────────────
   const isCash = input.type === PaymentType.CASH;
 
   const simulatedStatus: PaymentStatus = isCash
-    ? PaymentStatus.PENDING // settled physically later
+    ? PaymentStatus.PENDING
     : input.type === PaymentType.BLIK && Math.random() < 0.1
-      ? PaymentStatus.FAILED // BLIK 10 % failure
-      : PaymentStatus.SUCCESS; // CARD always succeeds
+      ? PaymentStatus.FAILED
+      : PaymentStatus.SUCCESS;
 
   return prisma.$transaction(async tx => {
     const payment = await tx.payment.create({
@@ -218,8 +224,6 @@ export const payOrder = async (userId: number, orderId: number, input: PayOrderI
       },
     });
 
-    // Only update order status for successful online payments.
-    // CASH orders stay NEW + PENDING — staff confirms them via admin panel.
     if (simulatedStatus === PaymentStatus.SUCCESS) {
       await tx.order.update({
         where: { id: orderId },
@@ -230,12 +234,10 @@ export const payOrder = async (userId: number, orderId: number, input: PayOrderI
       });
     }
 
-    const isCashPayment = input.type === PaymentType.CASH;
-
     return {
       payment,
-      success: isCashPayment || simulatedStatus === PaymentStatus.SUCCESS,
-      message: isCashPayment
+      success: isCash || simulatedStatus === PaymentStatus.SUCCESS,
+      message: isCash
         ? 'Order placed. Please pay at the counter.'
         : simulatedStatus === PaymentStatus.SUCCESS
           ? 'Payment successful'
