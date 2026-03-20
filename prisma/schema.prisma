@@ -297,13 +297,15 @@ enum PaymentType {
 }
 
 model PaymentMethod {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  cardType  String
-  last4     String   @db.VarChar(4)
-  expMonth  Int
-  expYear   Int
-  createdAt DateTime @default(now())
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  cardType   String
+  last4      String   @db.VarChar(4)
+  expMonth   Int
+  expYear    Int
+  isArchived Boolean  @default(false)
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
 
   user     User      @relation(fields: [userId], references: [id])
   payments Payment[]
