@@ -3,6 +3,10 @@ import { z } from 'zod';
 export const updateProfileSchema = z
   .object({
     name: z.string().min(1).optional(),
+    phone: z
+      .string()
+      .regex(/^\+?[0-9\s\-().]{7,20}$/, 'Invalid phone number')
+      .optional(),
     password: z.string().min(6).optional(),
     currentPassword: z.string().min(6).optional(),
   })
@@ -15,6 +19,10 @@ export const updateProfileSchema = z
 export const adminUpdateUserSchema = z
   .object({
     name: z.string().min(1).optional(),
+    phone: z
+      .string()
+      .regex(/^\+?[0-9\s\-().]{7,20}$/, 'Invalid phone number')
+      .optional(),
     password: z.string().min(6).optional(),
     role: z.enum(['USER', 'ADMIN']).optional(),
   })

@@ -22,6 +22,7 @@ model User {
   id           Int      @id @default(autoincrement())
   email        String   @unique
   password     String
+  phone        String   @unique
   name         String?
   createdAt    DateTime @default(now())
   role         UserRole @default(USER)
@@ -279,13 +280,13 @@ model ReservationPreOrder {
 }
 
 model Address {
-  id     Int    @id @default(autoincrement())
-  userId Int
-  city   String
-  street String
-  zip    String
-  phone  String @default("000000000")
-  user   User   @relation(fields: [userId], references: [id])
+  id        Int     @id @default(autoincrement())
+  userId    Int
+  city      String
+  street    String
+  zip       String
+  user      User    @relation(fields: [userId], references: [id])
+  isDefault Boolean @default(false)
 
   @@index([userId])
 }
@@ -297,13 +298,15 @@ enum PaymentType {
 }
 
 model PaymentMethod {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  cardType  String
-  last4     String   @db.VarChar(4)
-  expMonth  Int
-  expYear   Int
-  createdAt DateTime @default(now())
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  cardType   String
+  last4      String   @db.VarChar(4)
+  expMonth   Int
+  expYear    Int
+  isArchived Boolean  @default(false)
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
 
   user     User      @relation(fields: [userId], references: [id])
   payments Payment[]

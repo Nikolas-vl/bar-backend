@@ -29,10 +29,21 @@ export const update = async (req: Request, res: Response) => {
   res.json({ message: 'Updated' });
 };
 
-export const remove = async (req: Request, res: Response) => {
+export const setDefault = async (req: Request, res: Response) => {
   const userId = req.userId!;
   const { id } = paramSchema('id').parse(req.params);
 
-  await service.deletePaymentMethod(id, userId);
-  res.status(204).send();
+  await service.setDefaultPaymentMethod(id, userId);
+  res.json({ message: 'Default payment method updated' });
+};
+
+export const remove = async (req: Request, res: Response) => {
+  const userId = req.userId!;
+  const { id } = paramSchema('id').parse(req.params);
+  const result = await service.deletePaymentMethod(id, userId);
+  res.json({
+    success: true,
+    archived: result.archived,
+    message: result.archived ? 'Card archived — it will still appear in your past orders' : 'Card removed',
+  });
 };

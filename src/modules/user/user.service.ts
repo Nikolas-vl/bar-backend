@@ -4,9 +4,7 @@ import { NotFoundError, ValidationError } from '../../utils/errors';
 import { UpdateProfileInput, AdminUpdateUserInput, UserQuery } from './user.schema';
 
 export const getUserById = async (id: number) => {
-  const user = await prisma.user.findUnique({
-    where: { id },
-  });
+  const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new NotFoundError('User not found');
   return user;
 };
@@ -14,9 +12,10 @@ export const getUserById = async (id: number) => {
 export const updateUser = async (id: number, input: UpdateProfileInput) => {
   const user = await getUserById(id);
 
-  const data: { name?: string; password?: string } = {};
+  const data: { name?: string; phone?: string; password?: string } = {};
 
   if (input.name !== undefined) data.name = input.name;
+  if (input.phone !== undefined) data.phone = input.phone;
 
   if (input.password !== undefined) {
     const isMatch = await bcrypt.compare(input.currentPassword!, user.password);
@@ -31,6 +30,7 @@ export const updateUser = async (id: number, input: UpdateProfileInput) => {
       id: true,
       email: true,
       name: true,
+      phone: true,
       role: true,
     },
   });
@@ -48,6 +48,7 @@ export const getAllUsers = async (query: UserQuery) => {
         id: true,
         email: true,
         name: true,
+        phone: true,
         role: true,
         createdAt: true,
       },
@@ -60,9 +61,10 @@ export const getAllUsers = async (query: UserQuery) => {
 };
 
 export const adminUpdateUser = async (id: number, input: AdminUpdateUserInput) => {
-  const data: { name?: string; password?: string; role?: 'USER' | 'ADMIN' } = {};
+  const data: { name?: string; phone?: string; password?: string; role?: 'USER' | 'ADMIN' } = {};
 
   if (input.name !== undefined) data.name = input.name;
+  if (input.phone !== undefined) data.phone = input.phone;
   if (input.password !== undefined) data.password = await bcrypt.hash(input.password, 10);
   if (input.role !== undefined) data.role = input.role;
 
@@ -73,6 +75,7 @@ export const adminUpdateUser = async (id: number, input: AdminUpdateUserInput) =
       id: true,
       email: true,
       name: true,
+      phone: true,
       role: true,
     },
   });
