@@ -6,8 +6,13 @@ export const createOrderSchema = z
     type: z.enum(OrderType),
     comment: z.string().max(1000).optional(),
     discountPercent: z.number().min(0).max(100).default(0),
+    addressId: z.number().int().positive().optional(),
   })
-  .strict();
+  .strict()
+  .refine(data => data.type !== 'DELIVERY' || data.addressId !== undefined, {
+    message: 'addressId is required for DELIVERY orders',
+    path: ['addressId'],
+  });
 
 export const updateOrderStatusSchema = z
   .object({

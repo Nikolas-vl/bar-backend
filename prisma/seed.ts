@@ -92,6 +92,7 @@ async function main() {
   // ── Users ──────────────────────────────────────────────────────────────────
   const hashedPassword = await bcrypt.hash('password123', 10);
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
   const admin = await prisma.user.create({
     data: {
       email: 'admin@jolie.com',
