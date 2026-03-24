@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import prisma from '../../prisma';
+import { Prisma } from '../../../generated/prisma/client';
 import { NotFoundError, ValidationError } from '../../utils/errors';
 import { UpdateProfileInput, AdminUpdateUserInput, UserQuery } from './user.schema';
 
@@ -37,24 +38,25 @@ export const updateUser = async (id: number, input: UpdateProfileInput) => {
 };
 
 export const getAllUsers = async (query: UserQuery) => {
-  const { page, limit } = query;
+  const { page, limit, search, role } = query;
   const skip = (page - 1) * limit;
+
+  const where: Prisma.UserWhereInput = {
+    ...(search && {
+      OR: [{ name: { contains: search, mode: 'insensitive' } }, { email: { contains: search, mode: 'insensitive' } }],
+    }),
+    ...(role && { role }),
+  };
 
   const [users, total] = await prisma.$transaction([
     prisma.user.findMany({
+      where,
       skip,
       take: limit,
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        phone: true,
-        role: true,
-        createdAt: true,
-      },
+      select: { id: true, email: true, name: true, phone: true, role: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     }),
-    prisma.user.count(),
+    prisma.user.count({ where }),
   ]);
 
   return { users, total, page, limit };
@@ -82,9 +84,28 @@ export const adminUpdateUser = async (id: number, input: AdminUpdateUserInput) =
 };
 
 export const deleteUser = async (id: number) => {
-  const orderCount = await prisma.order.count({ where: { userId: id } });
-  if (orderCount > 0) {
-    throw new ValidationError('Cannot delete a user with existing orders');
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) throw new NotFoundError('User not found');
+  if (user.role === 'ADMIN') throw new ValidationError('Cannot delete an admin user');
+
+  const [orderCount, paymentCount] = await Promise.all([
+    prisma.order.count({ where: { userId: id } }),
+    prisma.payment.count({ where: { userId: id } }),
+  ]);
+
+  if (orderCount > 0 || paymentCount > 0) {
+    throw new ValidationError('Cannot delete a user with existing orders or payments');
   }
-  await prisma.user.delete({ where: { id } });
+
+  await prisma.$transaction(async tx => {
+    await tx.cartItemExtra.deleteMany({ where: { cartItem: { cart: { userId: id } } } });
+    await tx.cartItem.deleteMany({ where: { cart: { userId: id } } });
+    await tx.cartIngredientItem.deleteMany({ where: { cart: { userId: id } } });
+    await tx.cart.deleteMany({ where: { userId: id } });
+    await tx.address.deleteMany({ where: { userId: id } });
+    await tx.paymentMethod.deleteMany({ where: { userId: id } });
+    await tx.reservationPreOrder.deleteMany({ where: { reservation: { userId: id } } });
+    await tx.reservation.deleteMany({ where: { userId: id } });
+    await tx.user.delete({ where: { id } });
+  });
 };
