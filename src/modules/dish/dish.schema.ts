@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Category } from '../../../generated/prisma/client';
+import { Category } from '../../generated/prisma/client';
 
 // Dish ingredient sub-schema
 export const dishIngredientSchema = z

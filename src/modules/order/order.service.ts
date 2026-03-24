@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import prisma from '../../prisma';
-import { OrderStatus, PaymentStatus, PaymentType } from '../../../generated/prisma/client';
+import { OrderStatus, PaymentStatus, PaymentType } from '../../generated/prisma/client';
 import { NotFoundError, ValidationError } from '../../utils/errors';
 import { CreateOrderInput, UpdateOrderStatusInput, PayOrderInput, OrderQuery } from './order.schema';
 import { calcFinalTotal } from '../../utils/pricing';

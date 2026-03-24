@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import prisma from '../../prisma';
-import { Prisma } from '../../../generated/prisma/client';
+import { Prisma } from '../../generated/prisma/client';
 import { NotFoundError, ValidationError } from '../../utils/errors';
 import { UpdateProfileInput, AdminUpdateUserInput, UserQuery } from './user.schema';
 
