@@ -1,5 +1,5 @@
 import prisma from '../../prisma';
-import { Prisma } from '../../../generated/prisma/client';
+import { Prisma } from '../../generated/prisma/client';
 import { CreateDish, DishQuery, UpdateDish, AddIngredientToDish, UpdateDishIngredient } from './dish.schema';
 import { buildDishWhere } from './dish.utils';
 import { NotFoundError } from '../../utils/errors';

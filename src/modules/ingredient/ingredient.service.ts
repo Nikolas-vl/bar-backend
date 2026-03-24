@@ -1,5 +1,5 @@
 import prisma from '../../prisma';
-import { Prisma } from '../../../generated/prisma/client';
+import { Prisma } from '../../generated/prisma/client';
 import { CreateIngredient, UpdateIngredient, IngredientQuery } from './ingredient.schema';
 import { NotFoundError } from '../../utils/errors';
 

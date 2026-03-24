@@ -1,5 +1,5 @@
 import prisma from '../../prisma';
-import { ReservationStatus } from '../../../generated/prisma/client';
+import { ReservationStatus } from '../../generated/prisma/client';
 import { NotFoundError, ValidationError } from '../../utils/errors';
 import { sendReservationConfirmation } from '../../utils/mailer';
 import { CreateReservationInput, AdminCreateReservationInput, AdminUpdateReservationInput, ReservationQuery } from './reservation.schema';

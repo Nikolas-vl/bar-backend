@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ReservationStatus } from '../../../generated/prisma/client';
+import { ReservationStatus } from '../../generated/prisma/client';
 
 const preOrderItemSchema = z
   .object({
