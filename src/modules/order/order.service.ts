@@ -290,9 +290,12 @@ export const updateOrderStatus = async (orderId: number, input: UpdateOrderStatu
 
   if (!order) throw new NotFoundError('Order not found');
 
+  const paymentStatusPatch =
+    input.status === OrderStatus.PAID && order.paymentStatus !== PaymentStatus.FAILED ? { paymentStatus: PaymentStatus.SUCCESS } : {};
+
   return prisma.order.update({
     where: { id: orderId },
-    data: { status: input.status },
+    data: { status: input.status, ...paymentStatusPatch },
     include: orderInclude,
   });
 };
