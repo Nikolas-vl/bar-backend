@@ -1,5 +1,5 @@
 import prisma from '../../prisma';
-import { NotFoundError } from '../../utils/errors';
+import { NotFoundError, ValidationError } from '../../utils/errors';
 import { CreateLocationInput, UpdateLocationInput } from './location.schema';
 
 export const getAllLocations = () =>
@@ -31,6 +31,11 @@ export const updateLocation = async (id: number, input: UpdateLocationInput) => 
 export const deleteLocation = async (id: number) => {
   const location = await prisma.location.findUnique({ where: { id } });
   if (!location) throw new NotFoundError('Location not found');
+
+  const tableCount = await prisma.table.count({ where: { locationId: id } });
+  if (tableCount > 0) {
+    throw new ValidationError(`Cannot delete location: it has ${tableCount} table(s). Remove all tables first.`);
+  }
 
   return prisma.location.delete({ where: { id } });
 };

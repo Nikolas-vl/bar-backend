@@ -31,6 +31,8 @@ export const adminUpdateUserSchema = z
 export const userQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
+  search: z.string().optional(),
+  role: z.enum(['USER', 'ADMIN']).optional(),
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
