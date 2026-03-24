@@ -8,9 +8,9 @@ const isProd = process.env.NODE_ENV === 'production';
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: isProd,
-  sameSite: isProd ? ('strict' as const) : ('lax' as const),
+  sameSite: isProd ? ('none' as const) : ('lax' as const),
   maxAge: 7 * 24 * 60 * 60 * 1000,
-  path: '/api/auth/refresh',
+  path: '/',
 };
 
 export const register = async (req: Request, res: Response) => {
