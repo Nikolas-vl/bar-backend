@@ -12,11 +12,7 @@ import { asCorsHandler, useHandlers } from './utils/express';
 const app = express();
 
 const corsMiddleware = cors({
-  origin: [
-    'http://localhost:3000',
-    'https://bar-frontend-a2p2can01-nikolas-projects-dcf833e2.vercel.app',
-    'https://bar-frontend-git-main-nikolas-projects-dcf833e2.vercel.app',
-  ],
+  origin: ['http://localhost:3000', 'https://bar-frontend-eight.vercel.app'],
   credentials: true,
 });
 
@@ -33,6 +29,7 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
+logger.info('Server running on http://localhost:4000');
 app.use('/', routes);
 app.use(errorHandler);
 

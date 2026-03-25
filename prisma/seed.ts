@@ -1,4 +1,4 @@
-import { UserRole, Category, OrderType, OrderStatus, PaymentStatus } from '../generated/prisma/enums';
+import { UserRole, Category, OrderType, OrderStatus, PaymentStatus } from '../src/generated/prisma/enums';
 import * as bcrypt from 'bcrypt';
 import { prisma } from '../src/prisma';
 
