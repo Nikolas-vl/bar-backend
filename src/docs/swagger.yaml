@@ -1,0 +1,2998 @@
+openapi: 3.0.3
+info:
+  title: Jolie Bar & Restaurant API
+  description: >-
+    Comprehensive API for the Jolie bar ordering system — managing dishes,
+    ingredients, orders, reservations, cart, payments, users, and more.
+  version: '1.0.0'
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: /
+    description: Development server (relative)
+  - url: https://bar-backend-y9sr.onrender.com
+    description: Production server
+
+
+tags:
+  - name: Health
+    description: Health check endpoint
+  - name: Auth
+    description: Authentication and authorization
+  - name: Users
+    description: User profile and admin user management
+  - name: Addresses
+    description: User delivery addresses
+  - name: Payment Methods
+    description: User payment methods
+  - name: Ingredients
+    description: Ingredient management
+  - name: Dishes
+    description: Dish management and dish-ingredient relations
+  - name: Cart
+    description: Shopping cart operations
+  - name: Orders
+    description: Order placement, tracking, and admin management
+  - name: Reservations
+    description: Table reservations for users and admins
+  - name: Tables
+    description: Restaurant table management
+  - name: Settings
+    description: Restaurant settings
+  - name: Locations
+    description: Restaurant location management
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ──────────────────────────────────────────────
+  # Health
+  # ──────────────────────────────────────────────
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      security: []
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ──────────────────────────────────────────────
+  # Auth
+  # ──────────────────────────────────────────────
+  /auth/register:
+    post:
+      tags:
+        - Auth
+      summary: Register a new user
+      security: []
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Log in a user
+      security: []
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Auth
+      summary: Refresh access token
+      security: []
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Tokens refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: Log out the current user
+      security: []
+      operationId: logout
+      responses:
+        '200':
+          description: Logged out successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ──────────────────────────────────────────────
+  # Users
+  # ──────────────────────────────────────────────
+  /users/me:
+    get:
+      tags:
+        - Users
+      summary: Get current user profile
+      operationId: getMe
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags:
+        - Users
+      summary: Update current user profile
+      operationId: updateMe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMeRequest'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/admin/all:
+    get:
+      tags:
+        - Users
+      summary: List all users (admin)
+      operationId: adminGetAllUsers
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum:
+              - USER
+              - ADMIN
+      responses:
+        '200':
+          description: Paginated list of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /users/admin/{userId}:
+    get:
+      tags:
+        - Users
+      summary: Get a user by ID (admin)
+      operationId: adminGetUser
+      parameters:
+        - $ref: '#/components/parameters/UserIdPath'
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+        - Users
+      summary: Update a user (admin)
+      operationId: adminUpdateUser
+      parameters:
+        - $ref: '#/components/parameters/UserIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateUserRequest'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Users
+      summary: Delete a user (admin)
+      operationId: adminDeleteUser
+      parameters:
+        - $ref: '#/components/parameters/UserIdPath'
+      responses:
+        '204':
+          description: User deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ──────────────────────────────────────────────
+  # Addresses
+  # ──────────────────────────────────────────────
+  /addresses:
+    post:
+      tags:
+        - Addresses
+      summary: Create a new address
+      operationId: createAddress
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAddressRequest'
+      responses:
+        '201':
+          description: Address created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    get:
+      tags:
+        - Addresses
+      summary: List all addresses for current user
+      operationId: getAddresses
+      responses:
+        '200':
+          description: List of addresses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Address'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /addresses/{id}:
+    patch:
+      tags:
+        - Addresses
+      summary: Update an address
+      operationId: updateAddress
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAddressRequest'
+      responses:
+        '200':
+          description: Address updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Addresses
+      summary: Delete an address
+      operationId: deleteAddress
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204':
+          description: Address deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /addresses/{id}/default:
+    patch:
+      tags:
+        - Addresses
+      summary: Set an address as default
+      operationId: setDefaultAddress
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Address set as default
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ──────────────────────────────────────────────
+  # Payment Methods
+  # ──────────────────────────────────────────────
+  /payment:
+    post:
+      tags:
+        - Payment Methods
+      summary: Create a payment method
+      operationId: createPaymentMethod
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentMethodRequest'
+      responses:
+        '201':
+          description: Payment method created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethod'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    get:
+      tags:
+        - Payment Methods
+      summary: List all payment methods
+      operationId: getPaymentMethods
+      responses:
+        '200':
+          description: List of payment methods
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentMethod'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /payment/{id}:
+    get:
+      tags:
+        - Payment Methods
+      summary: Get a payment method by ID
+      operationId: getPaymentMethod
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Payment method details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethod'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+        - Payment Methods
+      summary: Update a payment method
+      operationId: updatePaymentMethod
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePaymentMethodRequest'
+      responses:
+        '200':
+          description: Payment method updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethod'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Payment Methods
+      summary: Delete a payment method
+      operationId: deletePaymentMethod
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204':
+          description: Payment method deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /payment/{id}/default:
+    patch:
+      tags:
+        - Payment Methods
+      summary: Set a payment method as default
+      operationId: setDefaultPaymentMethod
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Payment method set as default
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethod'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ──────────────────────────────────────────────
+  # Ingredients
+  # ──────────────────────────────────────────────
+  /ingredients:
+    get:
+      tags:
+        - Ingredients
+      summary: List all ingredients
+      security: []
+      operationId: getIngredients
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum:
+              - name
+              - price
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+      responses:
+        '200':
+          description: List of ingredients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ingredient'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    post:
+      tags:
+        - Ingredients
+      summary: Create an ingredient (admin)
+      operationId: createIngredient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateIngredientRequest'
+      responses:
+        '201':
+          description: Ingredient created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ingredient'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /ingredients/{id}:
+    get:
+      tags:
+        - Ingredients
+      summary: Get an ingredient by ID
+      security: []
+      operationId: getIngredient
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Ingredient details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ingredient'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+        - Ingredients
+      summary: Update an ingredient (admin)
+      operationId: updateIngredient
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateIngredientRequest'
+      responses:
+        '200':
+          description: Ingredient updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ingredient'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Ingredients
+      summary: Delete an ingredient (admin)
+      operationId: deleteIngredient
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204':
+          description: Ingredient deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /ingredients/{id}/dishes:
+    get:
+      tags:
+        - Ingredients
+      summary: Get dishes that use this ingredient
+      security: []
+      operationId: getIngredientDishes
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: List of dishes using this ingredient
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Dish'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ──────────────────────────────────────────────
+  # Dishes
+  # ──────────────────────────────────────────────
+  /dishes:
+    get:
+      tags:
+        - Dishes
+      summary: List all dishes
+      security: []
+      operationId: getDishes
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum:
+              - BREAKFAST
+              - LUNCH
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+        - name: minCalories
+          in: query
+          schema:
+            type: number
+        - name: maxCalories
+          in: query
+          schema:
+            type: number
+        - name: isAvailable
+          in: query
+          schema:
+            type: boolean
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum:
+              - name
+              - price
+              - calories
+              - protein
+              - fat
+              - carbs
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+      responses:
+        '200':
+          description: List of dishes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Dish'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    post:
+      tags:
+        - Dishes
+      summary: Create a dish (admin)
+      operationId: createDish
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDishRequest'
+      responses:
+        '201':
+          description: Dish created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dish'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /dishes/{id}:
+    get:
+      tags:
+        - Dishes
+      summary: Get a dish by ID
+      security: []
+      operationId: getDish
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Dish details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dish'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+        - Dishes
+      summary: Update a dish (admin)
+      operationId: updateDish
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDishRequest'
+      responses:
+        '200':
+          description: Dish updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dish'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Dishes
+      summary: Delete a dish (admin)
+      operationId: deleteDish
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204':
+          description: Dish deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /dishes/{id}/ingredients:
+    post:
+      tags:
+        - Dishes
+      summary: Add an ingredient to a dish (admin)
+      operationId: addDishIngredient
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddDishIngredientRequest'
+      responses:
+        '201':
+          description: Ingredient added to dish
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DishIngredient'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /dishes/{id}/ingredients/{ingredientId}:
+    patch:
+      tags:
+        - Dishes
+      summary: Update a dish ingredient (admin)
+      operationId: updateDishIngredient
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+        - $ref: '#/components/parameters/IngredientIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDishIngredientRequest'
+      responses:
+        '200':
+          description: Dish ingredient updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DishIngredient'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Dishes
+      summary: Remove an ingredient from a dish (admin)
+      operationId: deleteDishIngredient
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+        - $ref: '#/components/parameters/IngredientIdPath'
+      responses:
+        '204':
+          description: Ingredient removed from dish
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ──────────────────────────────────────────────
+  # Cart
+  # ──────────────────────────────────────────────
+  /cart:
+    get:
+      tags:
+        - Cart
+      summary: Get the current user's cart
+      operationId: getCart
+      responses:
+        '200':
+          description: Cart contents
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags:
+        - Cart
+      summary: Clear the cart
+      operationId: clearCart
+      responses:
+        '204':
+          description: Cart cleared
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /cart/items:
+    post:
+      tags:
+        - Cart
+      summary: Add a dish item to the cart
+      operationId: addCartItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCartItemRequest'
+      responses:
+        '201':
+          description: Item added to cart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /cart/items/{cartItemId}:
+    patch:
+      tags:
+        - Cart
+      summary: Update a cart item
+      operationId: updateCartItem
+      parameters:
+        - $ref: '#/components/parameters/CartItemIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCartItemRequest'
+      responses:
+        '200':
+          description: Cart item updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Cart
+      summary: Remove a cart item
+      operationId: deleteCartItem
+      parameters:
+        - $ref: '#/components/parameters/CartItemIdPath'
+      responses:
+        '204':
+          description: Cart item removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /cart/items/{cartItemId}/extras:
+    post:
+      tags:
+        - Cart
+      summary: Add an extra ingredient to a cart item
+      operationId: addCartItemExtra
+      parameters:
+        - $ref: '#/components/parameters/CartItemIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCartItemExtraRequest'
+      responses:
+        '201':
+          description: Extra added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartItemExtra'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /cart/items/{cartItemId}/extras/{ingredientId}:
+    patch:
+      tags:
+        - Cart
+      summary: Update an extra on a cart item
+      operationId: updateCartItemExtra
+      parameters:
+        - $ref: '#/components/parameters/CartItemIdPath'
+        - $ref: '#/components/parameters/IngredientIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCartItemExtraRequest'
+      responses:
+        '200':
+          description: Extra updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartItemExtra'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Cart
+      summary: Remove an extra from a cart item
+      operationId: deleteCartItemExtra
+      parameters:
+        - $ref: '#/components/parameters/CartItemIdPath'
+        - $ref: '#/components/parameters/IngredientIdPath'
+      responses:
+        '204':
+          description: Extra removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /cart/ingredients:
+    post:
+      tags:
+        - Cart
+      summary: Add a standalone ingredient to the cart
+      operationId: addCartIngredient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCartIngredientRequest'
+      responses:
+        '201':
+          description: Ingredient added to cart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartIngredientItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /cart/ingredients/{itemId}:
+    patch:
+      tags:
+        - Cart
+      summary: Update a standalone cart ingredient
+      operationId: updateCartIngredient
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCartIngredientRequest'
+      responses:
+        '200':
+          description: Cart ingredient updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartIngredientItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Cart
+      summary: Remove a standalone cart ingredient
+      operationId: deleteCartIngredient
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Cart ingredient removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ──────────────────────────────────────────────
+  # Orders
+  # ──────────────────────────────────────────────
+  /orders:
+    post:
+      tags:
+        - Orders
+      summary: Create an order from the current cart
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    get:
+      tags:
+        - Orders
+      summary: List current user's orders
+      operationId: getOrders
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum:
+              - NEW
+              - PAID
+              - PREPARING
+              - COMPLETED
+              - CANCELED
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: List of orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /orders/{orderId}:
+    get:
+      tags:
+        - Orders
+      summary: Get an order by ID
+      operationId: getOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderIdPath'
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /orders/{orderId}/cancel:
+    patch:
+      tags:
+        - Orders
+      summary: Cancel an order
+      operationId: cancelOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderIdPath'
+      responses:
+        '200':
+          description: Order canceled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /orders/{orderId}/pay:
+    post:
+      tags:
+        - Orders
+      summary: Pay for an order
+      operationId: payOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PayOrderRequest'
+      responses:
+        '200':
+          description: Payment processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /orders/admin/all:
+    get:
+      tags:
+        - Orders
+      summary: List all orders (admin)
+      operationId: adminGetAllOrders
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum:
+              - NEW
+              - PAID
+              - PREPARING
+              - COMPLETED
+              - CANCELED
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: All orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /orders/admin/{orderId}:
+    get:
+      tags:
+        - Orders
+      summary: Get any order by ID (admin)
+      operationId: adminGetOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderIdPath'
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Orders
+      summary: Delete an order (admin)
+      operationId: adminDeleteOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderIdPath'
+      responses:
+        '204':
+          description: Order deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /orders/admin/{orderId}/status:
+    patch:
+      tags:
+        - Orders
+      summary: Update order status (admin)
+      operationId: adminUpdateOrderStatus
+      parameters:
+        - $ref: '#/components/parameters/OrderIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum:
+                    - NEW
+                    - PAID
+                    - PREPARING
+                    - COMPLETED
+                    - CANCELED
+      responses:
+        '200':
+          description: Order status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ──────────────────────────────────────────────
+  # Reservations
+  # ──────────────────────────────────────────────
+  /reservations:
+    post:
+      tags:
+        - Reservations
+      summary: Create a reservation
+      operationId: createReservation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReservationRequest'
+      responses:
+        '201':
+          description: Reservation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reservation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    get:
+      tags:
+        - Reservations
+      summary: List current user's reservations
+      operationId: getReservations
+      responses:
+        '200':
+          description: List of reservations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Reservation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /reservations/{id}:
+    get:
+      tags:
+        - Reservations
+      summary: Get a reservation by ID
+      operationId: getReservation
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Reservation details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reservation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /reservations/{id}/cancel:
+    patch:
+      tags:
+        - Reservations
+      summary: Cancel a reservation
+      operationId: cancelReservation
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Reservation canceled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reservation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /reservations/admin/all:
+    get:
+      tags:
+        - Reservations
+      summary: List all reservations (admin)
+      operationId: adminGetAllReservations
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum:
+              - PENDING
+              - CONFIRMED
+              - CANCELED
+        - name: tableId
+          in: query
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: All reservations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Reservation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /reservations/admin:
+    post:
+      tags:
+        - Reservations
+      summary: Create a reservation for any user (admin)
+      operationId: adminCreateReservation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateReservationRequest'
+      responses:
+        '201':
+          description: Reservation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reservation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /reservations/admin/{id}:
+    patch:
+      tags:
+        - Reservations
+      summary: Update a reservation (admin)
+      operationId: adminUpdateReservation
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateReservationRequest'
+      responses:
+        '200':
+          description: Reservation updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reservation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Reservations
+      summary: Delete a reservation (admin)
+      operationId: adminDeleteReservation
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204':
+          description: Reservation deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ──────────────────────────────────────────────
+  # Tables
+  # ──────────────────────────────────────────────
+  /tables:
+    get:
+      tags:
+        - Tables
+      summary: List all tables
+      security: []
+      operationId: getTables
+      responses:
+        '200':
+          description: List of tables
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Table'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    post:
+      tags:
+        - Tables
+      summary: Create a table (admin)
+      operationId: createTable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTableRequest'
+      responses:
+        '201':
+          description: Table created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Table'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /tables/{id}:
+    patch:
+      tags:
+        - Tables
+      summary: Update a table (admin)
+      operationId: updateTable
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTableRequest'
+      responses:
+        '200':
+          description: Table updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Table'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Tables
+      summary: Delete a table (admin)
+      operationId: deleteTable
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204':
+          description: Table deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ──────────────────────────────────────────────
+  # Settings
+  # ──────────────────────────────────────────────
+  /settings:
+    get:
+      tags:
+        - Settings
+      summary: Get restaurant settings
+      security: []
+      operationId: getSettings
+      responses:
+        '200':
+          description: Current settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /settings/admin:
+    patch:
+      tags:
+        - Settings
+      summary: Update restaurant settings (admin)
+      operationId: updateSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSettingsRequest'
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ──────────────────────────────────────────────
+  # Locations
+  # ──────────────────────────────────────────────
+  /locations:
+    get:
+      tags:
+        - Locations
+      summary: List all locations
+      security: []
+      operationId: getLocations
+      responses:
+        '200':
+          description: List of locations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Location'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /locations/{id}:
+    get:
+      tags:
+        - Locations
+      summary: Get a location by ID
+      security: []
+      operationId: getLocation
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Location details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /locations/admin:
+    post:
+      tags:
+        - Locations
+      summary: Create a location (admin)
+      operationId: createLocation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLocationRequest'
+      responses:
+        '201':
+          description: Location created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /locations/admin/{id}:
+    patch:
+      tags:
+        - Locations
+      summary: Update a location (admin)
+      operationId: updateLocation
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLocationRequest'
+      responses:
+        '200':
+          description: Location updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Locations
+      summary: Delete a location (admin)
+      operationId: deleteLocation
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204':
+          description: Location deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+# ════════════════════════════════════════════════
+# Components
+# ════════════════════════════════════════════════
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  # ────────────────────────────────────────────
+  # Reusable Parameters
+  # ────────────────────────────────────────────
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    UserIdPath:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: integer
+    OrderIdPath:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: integer
+    CartItemIdPath:
+      name: cartItemId
+      in: path
+      required: true
+      schema:
+        type: integer
+    IngredientIdPath:
+      name: ingredientId
+      in: path
+      required: true
+      schema:
+        type: integer
+
+  # ────────────────────────────────────────────
+  # Reusable Responses
+  # ────────────────────────────────────────────
+  responses:
+    BadRequest:
+      description: Bad request - validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Unauthorized - missing or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  # ────────────────────────────────────────────
+  # Schemas
+  # ────────────────────────────────────────────
+  schemas:
+    # ── Error ──
+    ErrorResponse:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+
+    # ── Auth request / response ──
+    RegisterRequest:
+      type: object
+      required:
+        - name
+        - email
+        - password
+        - phone
+      properties:
+        name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+        phone:
+          type: string
+          description: Phone number matching the accepted regex pattern
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+
+    LoginResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+
+    TokenPair:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+
+    # ── User ──
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        name:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        role:
+          type: string
+          enum:
+            - USER
+            - ADMIN
+
+    UpdateMeRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        phone:
+          type: string
+        password:
+          type: string
+          minLength: 6
+        currentPassword:
+          type: string
+          minLength: 6
+
+    AdminUpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        phone:
+          type: string
+        password:
+          type: string
+          minLength: 6
+        role:
+          type: string
+          enum:
+            - USER
+            - ADMIN
+
+    # ── Address ──
+    Address:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        city:
+          type: string
+        street:
+          type: string
+        zip:
+          type: string
+        isDefault:
+          type: boolean
+
+    CreateAddressRequest:
+      type: object
+      required:
+        - city
+        - street
+        - zip
+      properties:
+        city:
+          type: string
+          minLength: 1
+        street:
+          type: string
+          minLength: 1
+        zip:
+          type: string
+          minLength: 1
+
+    UpdateAddressRequest:
+      type: object
+      properties:
+        city:
+          type: string
+        street:
+          type: string
+        zip:
+          type: string
+
+    # ── Payment Method ──
+    PaymentMethod:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        cardType:
+          type: string
+        last4:
+          type: string
+        expMonth:
+          type: integer
+        expYear:
+          type: integer
+        isArchived:
+          type: boolean
+        isDefault:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    CreatePaymentMethodRequest:
+      type: object
+      required:
+        - cardType
+        - last4
+        - expMonth
+        - expYear
+      properties:
+        cardType:
+          type: string
+          minLength: 2
+        last4:
+          type: string
+          minLength: 4
+          maxLength: 4
+        expMonth:
+          type: integer
+          minimum: 1
+          maximum: 12
+        expYear:
+          type: integer
+          description: Must be the current year or later
+
+    UpdatePaymentMethodRequest:
+      type: object
+      properties:
+        cardType:
+          type: string
+          minLength: 2
+        last4:
+          type: string
+          minLength: 4
+          maxLength: 4
+        expMonth:
+          type: integer
+          minimum: 1
+          maximum: 12
+        expYear:
+          type: integer
+
+    # ── Ingredient ──
+    Ingredient:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        price:
+          type: number
+          format: double
+
+    CreateIngredientRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        price:
+          type: number
+          minimum: 0
+          default: 0
+
+    UpdateIngredientRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        price:
+          type: number
+          minimum: 0
+
+    # ── Dish ──
+    Dish:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        price:
+          type: number
+          format: double
+        imageUrl:
+          type: string
+          nullable: true
+          format: uri
+        calories:
+          type: integer
+          nullable: true
+        protein:
+          type: number
+          nullable: true
+        fat:
+          type: number
+          nullable: true
+        carbs:
+          type: number
+          nullable: true
+        category:
+          type: string
+          enum:
+            - BREAKFAST
+            - LUNCH
+        isAvailable:
+          type: boolean
+
+    DishIngredient:
+      type: object
+      properties:
+        dishId:
+          type: integer
+        ingredientId:
+          type: integer
+        optional:
+          type: boolean
+        quantity:
+          type: integer
+
+    DishIngredientInput:
+      type: object
+      required:
+        - ingredientId
+      properties:
+        ingredientId:
+          type: integer
+        quantity:
+          type: number
+          default: 1
+        optional:
+          type: boolean
+          default: false
+
+    CreateDishRequest:
+      type: object
+      required:
+        - name
+        - price
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        price:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+        imageUrl:
+          type: string
+          format: uri
+        calories:
+          type: integer
+          minimum: 0
+        protein:
+          type: number
+          minimum: 0
+        fat:
+          type: number
+          minimum: 0
+        carbs:
+          type: number
+          minimum: 0
+        category:
+          type: string
+          enum:
+            - BREAKFAST
+            - LUNCH
+        isAvailable:
+          type: boolean
+        ingredients:
+          type: array
+          items:
+            $ref: '#/components/schemas/DishIngredientInput'
+
+    UpdateDishRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        price:
+          type: number
+          exclusiveMinimum: true
+          minimum: 0
+        imageUrl:
+          type: string
+          format: uri
+        calories:
+          type: integer
+          minimum: 0
+        protein:
+          type: number
+          minimum: 0
+        fat:
+          type: number
+          minimum: 0
+        carbs:
+          type: number
+          minimum: 0
+        category:
+          type: string
+          enum:
+            - BREAKFAST
+            - LUNCH
+        isAvailable:
+          type: boolean
+        ingredients:
+          type: array
+          items:
+            $ref: '#/components/schemas/DishIngredientInput'
+
+    AddDishIngredientRequest:
+      type: object
+      required:
+        - ingredientId
+      properties:
+        ingredientId:
+          type: integer
+        quantity:
+          type: number
+          default: 1
+        optional:
+          type: boolean
+          default: false
+
+    UpdateDishIngredientRequest:
+      type: object
+      properties:
+        quantity:
+          type: number
+        optional:
+          type: boolean
+
+    # ── Cart ──
+    Cart:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CartItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        cartId:
+          type: integer
+        dishId:
+          type: integer
+        quantity:
+          type: integer
+        note:
+          type: string
+          nullable: true
+
+    CartItemExtra:
+      type: object
+      properties:
+        id:
+          type: integer
+        cartItemId:
+          type: integer
+        ingredientId:
+          type: integer
+        quantity:
+          type: integer
+        note:
+          type: string
+          nullable: true
+
+    CartIngredientItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        cartId:
+          type: integer
+        ingredientId:
+          type: integer
+        quantity:
+          type: integer
+        note:
+          type: string
+          nullable: true
+
+    AddCartItemRequest:
+      type: object
+      required:
+        - dishId
+      properties:
+        dishId:
+          type: integer
+        quantity:
+          type: integer
+          minimum: 1
+          default: 1
+        note:
+          type: string
+          maxLength: 500
+        extras:
+          type: array
+          items:
+            type: object
+            required:
+              - ingredientId
+            properties:
+              ingredientId:
+                type: integer
+              quantity:
+                type: integer
+                default: 1
+              note:
+                type: string
+                maxLength: 500
+
+    UpdateCartItemRequest:
+      type: object
+      properties:
+        quantity:
+          type: integer
+          minimum: 0
+        note:
+          type: string
+          nullable: true
+          maxLength: 500
+
+    AddCartItemExtraRequest:
+      type: object
+      required:
+        - ingredientId
+      properties:
+        ingredientId:
+          type: integer
+        quantity:
+          type: integer
+          default: 1
+        note:
+          type: string
+          maxLength: 500
+
+    UpdateCartItemExtraRequest:
+      type: object
+      properties:
+        quantity:
+          type: integer
+          minimum: 0
+        note:
+          type: string
+          nullable: true
+          maxLength: 500
+
+    AddCartIngredientRequest:
+      type: object
+      required:
+        - ingredientId
+      properties:
+        ingredientId:
+          type: integer
+        quantity:
+          type: integer
+          minimum: 1
+          default: 1
+        note:
+          type: string
+          maxLength: 500
+
+    UpdateCartIngredientRequest:
+      type: object
+      properties:
+        quantity:
+          type: integer
+          minimum: 0
+        note:
+          type: string
+          nullable: true
+          maxLength: 500
+
+    # ── Order ──
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        type:
+          type: string
+          enum:
+            - DINE_IN
+            - DELIVERY
+            - TAKE_OUT
+        status:
+          type: string
+          enum:
+            - NEW
+            - PAID
+            - PREPARING
+            - COMPLETED
+            - CANCELED
+        subtotal:
+          type: number
+          format: double
+        discount:
+          type: number
+          format: double
+        tax:
+          type: number
+          format: double
+        deliveryFee:
+          type: number
+          format: double
+        serviceFee:
+          type: number
+          format: double
+        total:
+          type: number
+          format: double
+        paymentStatus:
+          type: string
+          enum:
+            - PENDING
+            - SUCCESS
+            - FAILED
+        comment:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        addressId:
+          type: integer
+          nullable: true
+
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        orderId:
+          type: integer
+        dishId:
+          type: integer
+        quantity:
+          type: integer
+        note:
+          type: string
+          nullable: true
+
+    CreateOrderRequest:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - DINE_IN
+            - DELIVERY
+            - TAKE_OUT
+        comment:
+          type: string
+          maxLength: 1000
+        discountPercent:
+          type: number
+          minimum: 0
+          maximum: 100
+          default: 0
+        addressId:
+          type: integer
+          description: Required when type is DELIVERY
+
+    PayOrderRequest:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - CARD
+            - CASH
+            - BLIK
+        paymentMethodId:
+          type: integer
+          description: Required when type is CARD
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: integer
+        orderId:
+          type: integer
+        userId:
+          type: integer
+        amount:
+          type: number
+          format: double
+        status:
+          type: string
+          enum:
+            - PENDING
+            - SUCCESS
+            - FAILED
+        paymentMethodId:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum:
+            - CARD
+            - CASH
+            - BLIK
+
+    # ── Reservation ──
+    Reservation:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        tableId:
+          type: integer
+          nullable: true
+        date:
+          type: string
+          format: date-time
+        guests:
+          type: integer
+        status:
+          type: string
+          enum:
+            - PENDING
+            - CONFIRMED
+            - CANCELED
+        comment:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ReservationPreOrder:
+      type: object
+      properties:
+        id:
+          type: integer
+        reservationId:
+          type: integer
+        dishId:
+          type: integer
+        quantity:
+          type: integer
+
+    PreOrderInput:
+      type: object
+      required:
+        - dishId
+      properties:
+        dishId:
+          type: integer
+        quantity:
+          type: integer
+          minimum: 1
+          default: 1
+
+    CreateReservationRequest:
+      type: object
+      required:
+        - date
+        - guests
+      properties:
+        date:
+          type: string
+          format: date-time
+          description: Must be a future date
+        guests:
+          type: integer
+          minimum: 1
+        comment:
+          type: string
+          maxLength: 500
+        preOrders:
+          type: array
+          items:
+            $ref: '#/components/schemas/PreOrderInput'
+
+    AdminCreateReservationRequest:
+      type: object
+      required:
+        - date
+        - guests
+        - userId
+      properties:
+        date:
+          type: string
+          format: date-time
+          description: Must be a future date
+        guests:
+          type: integer
+          minimum: 1
+        comment:
+          type: string
+          maxLength: 500
+        preOrders:
+          type: array
+          items:
+            $ref: '#/components/schemas/PreOrderInput'
+        userId:
+          type: integer
+        tableId:
+          type: integer
+        status:
+          type: string
+          enum:
+            - PENDING
+            - CONFIRMED
+            - CANCELED
+
+    AdminUpdateReservationRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date-time
+        guests:
+          type: integer
+          minimum: 1
+        tableId:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum:
+            - PENDING
+            - CONFIRMED
+            - CANCELED
+        comment:
+          type: string
+          maxLength: 500
+        preOrders:
+          type: array
+          items:
+            $ref: '#/components/schemas/PreOrderInput'
+
+    # ── Table ──
+    Table:
+      type: object
+      properties:
+        id:
+          type: integer
+        number:
+          type: integer
+        capacity:
+          type: integer
+        locationId:
+          type: integer
+
+    CreateTableRequest:
+      type: object
+      required:
+        - number
+        - capacity
+        - locationId
+      properties:
+        number:
+          type: integer
+          minimum: 1
+        capacity:
+          type: integer
+          minimum: 1
+        locationId:
+          type: integer
+          minimum: 1
+
+    UpdateTableRequest:
+      type: object
+      properties:
+        number:
+          type: integer
+          minimum: 1
+        capacity:
+          type: integer
+          minimum: 1
+        locationId:
+          type: integer
+          minimum: 1
+
+    # ── Settings ──
+    Settings:
+      type: object
+      properties:
+        id:
+          type: integer
+        restaurantName:
+          type: string
+        taxRate:
+          type: number
+          format: double
+        deliveryFee:
+          type: number
+          format: double
+        serviceFee:
+          type: number
+          format: double
+        freeDeliveryThreshold:
+          type: number
+          format: double
+        updatedAt:
+          type: string
+          format: date-time
+
+    UpdateSettingsRequest:
+      type: object
+      properties:
+        restaurantName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        taxRate:
+          type: number
+          minimum: 0
+          maximum: 1
+        deliveryFee:
+          type: number
+          minimum: 0
+        serviceFee:
+          type: number
+          minimum: 0
+        freeDeliveryThreshold:
+          type: number
+          minimum: 0
+
+    # ── Location ──
+    Location:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        address:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+        openingHours:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateLocationRequest:
+      type: object
+      required:
+        - name
+        - address
+        - phone
+        - email
+        - openingHours
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        address:
+          type: string
+          minLength: 1
+          maxLength: 255
+        phone:
+          type: string
+          minLength: 1
+          maxLength: 20
+        email:
+          type: string
+          format: email
+        openingHours:
+          type: string
+          minLength: 1
+          maxLength: 50
+
+    UpdateLocationRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        address:
+          type: string
+          minLength: 1
+          maxLength: 255
+        phone:
+          type: string
+          minLength: 1
+          maxLength: 20
+        email:
+          type: string
+          format: email
+        openingHours:
+          type: string
+          minLength: 1
+          maxLength: 50
+        isActive:
+          type: boolean

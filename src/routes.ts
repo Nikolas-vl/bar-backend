@@ -12,6 +12,7 @@ import tableRoutes from './modules/table/table.routes';
 import { requireAuth } from './middlewares/auth';
 import locationRoutes from './modules/location/location.routes';
 import settingsRoutes from './modules/settings/settings.routes';
+import swaggerRouter from './docs/swagger';
 
 const router = Router();
 
@@ -27,4 +28,5 @@ router.use('/reservations', requireAuth, reservationRoutes);
 router.use('/tables', tableRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/locations', locationRoutes);
+router.use('/api-docs', swaggerRouter);
 export default router;

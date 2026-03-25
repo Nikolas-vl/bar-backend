@@ -25,11 +25,14 @@ app.use(asCorsHandler(corsMiddleware));
 const httpLogger = pinoHttp({ logger });
 useHandlers(app, httpLogger, express.json(), cookieParser());
 
+app.get('/', (_req, res) => {
+  res.redirect('/api-docs');
+});
+
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-logger.info('Server running on http://localhost:4000');
 app.use('/', routes);
 app.use(errorHandler);
 
