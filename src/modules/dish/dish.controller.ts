@@ -8,9 +8,12 @@ import {
   addIngredientToDish as addIngredientService,
   removeIngredientFromDish as removeIngredientService,
   updateDishIngredient as updateDishIngredientService,
+  manageDishImage as manageDishImageService,
+  deleteDishImage as deleteDishImageService,
 } from './dish.service';
 import { DishQuery } from './dish.schema';
 import { paramSchema } from '../../utils/common.schema';
+import { uploadImage } from '../../utils/uploadToCloudinary';
 
 export const getDishes = async (req: Request, res: Response) => {
   req.log.info({ query: req.query }, 'Fetching dishes');
@@ -80,4 +83,20 @@ export const updateDishIngredient = async (req: Request, res: Response) => {
 
   req.log.info({ dishId: id, ingredientId }, 'Dish ingredient updated');
   res.json(updated);
+};
+
+export const manageDishImage = async (req: Request, res: Response) => {
+  const { id: dishId } = paramSchema('id').parse(req.params);
+
+  if (req.file) {
+    const result = await uploadImage(req.file.buffer);
+    const dish = await manageDishImageService(dishId, result.secure_url, result.public_id);
+    return res.json(dish);
+  }
+  if (req.query.action === 'delete') {
+    const dish = await deleteDishImageService(dishId);
+    return res.json(dish);
+  }
+
+  return res.status(400).json({ message: 'No file uploaded' });
 };
