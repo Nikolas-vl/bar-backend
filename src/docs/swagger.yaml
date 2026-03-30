@@ -926,6 +926,58 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /dishes/{id}/image:
+    patch:
+      tags:
+        - Dishes
+      summary: Upload or delete a dish image (admin)
+      description: |
+        **Upload**: Send a `multipart/form-data` request with an `image` field
+        containing the file (JPEG · PNG · WebP, max 5 MB).
+
+        **Delete**: Send the request with query parameter `?action=delete`
+        (no body required).
+      operationId: manageDishImage
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+        - name: action
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - delete
+          description: Pass `delete` to remove the current image.
+      requestBody:
+        required: false
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: Image file (JPEG, PNG or WebP, max 5 MB)
+      responses:
+        '200':
+          description: Dish with updated image URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dish'
+        '400':
+          description: No file provided, file too large, or invalid format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   # ──────────────────────────────────────────────
   # Cart
   # ──────────────────────────────────────────────
@@ -2246,6 +2298,10 @@ components:
           type: string
           nullable: true
           format: uri
+        imageId:
+          type: string
+          nullable: true
+          description: Cloudinary public_id used for image transformations
         calories:
           type: integer
           nullable: true

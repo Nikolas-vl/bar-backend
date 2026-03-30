@@ -12,7 +12,7 @@ import { asCorsHandler, useHandlers } from './utils/express';
 const app = express();
 
 const corsMiddleware = cors({
-  origin: ['http://localhost:3000', 'https://bar-frontend-eight.vercel.app'],
+  origin: process.env.CORS_ORIGIN?.split(','),
   credentials: true,
 });
 

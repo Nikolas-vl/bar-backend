@@ -3,6 +3,10 @@ import { Prisma } from '../../generated/prisma/client';
 import { CreateDish, DishQuery, UpdateDish, AddIngredientToDish, UpdateDishIngredient } from './dish.schema';
 import { buildDishWhere } from './dish.utils';
 import { NotFoundError } from '../../utils/errors';
+import cloudinary from '../../utils/cloudinary';
+import { logger } from '../../utils/logger';
+import { optimizedUrl } from '../../utils/uploadToCloudinary';
+import { Dish } from '../../generated/prisma/client';
 
 const dishInclude = {
   ingredients: {
@@ -121,3 +125,40 @@ export const updateDishIngredient = (dishId: number, ingredientId: number, data:
     },
   });
 };
+
+export const manageDishImage = async (dishId: number, imageUrl: string, imageId: string) => {
+  const dish = await prisma.dish.findUnique({ where: { id: dishId } });
+  if (!dish) throw new NotFoundError('Dish not found');
+
+  if (dish.imageId) {
+    await cloudinary.uploader.destroy(dish.imageId).catch(err => logger.warn({ err }, 'Failed to delete old Cloudinary image'));
+  }
+
+  const updatedDish = await prisma.dish.update({
+    where: { id: dishId },
+    data: { imageUrl, imageId },
+    include: dishInclude,
+  });
+
+  return formatDishImage(updatedDish);
+};
+
+export const deleteDishImage = async (dishId: number) => {
+  const dish = await prisma.dish.findUnique({ where: { id: dishId } });
+  if (!dish) throw new NotFoundError('Dish not found');
+
+  if (dish.imageId) {
+    await cloudinary.uploader.destroy(dish.imageId).catch(err => logger.warn({ err }, 'Failed to delete Cloudinary image'));
+  }
+
+  return prisma.dish.update({
+    where: { id: dishId },
+    data: { imageUrl: null, imageId: null },
+    include: dishInclude,
+  });
+};
+
+export const formatDishImage = (dish: Dish) => ({
+  ...dish,
+  imageUrl: dish.imageId ? optimizedUrl(dish.imageId) : null,
+});

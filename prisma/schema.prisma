@@ -102,6 +102,7 @@ model Dish {
   description String?
   price       Decimal @db.Decimal(10, 2)
   imageUrl    String?
+  imageId     String?
   calories    Int?
   protein     Float?
   fat         Float?
