@@ -1,14 +1,41 @@
 import bcrypt from 'bcrypt';
 import prisma from '../../prisma';
-import { Prisma } from '../../generated/prisma/client';
+import { Prisma, OrderStatus } from '../../generated/prisma/client';
 import { NotFoundError, ValidationError } from '../../utils/errors';
 import { UpdateProfileInput, AdminUpdateUserInput, UserQuery } from './user.schema';
+
+const ACTIVE_ORDER_STATUSES: OrderStatus[] = [OrderStatus.NEW, OrderStatus.PAID, OrderStatus.PREPARING];
+
+const getActiveOrderCountMap = async (userIds: number[]) => {
+  if (userIds.length === 0) {
+    return new Map<number, number>();
+  }
+
+  const counts = await prisma.order.groupBy({
+    by: ['userId'],
+    where: {
+      userId: { in: userIds },
+      status: { in: ACTIVE_ORDER_STATUSES },
+    },
+    _count: { _all: true },
+  });
+
+  return new Map<number, number>(counts.map(row => [row.userId, row._count._all]));
+};
 
 export const getUserById = async (id: number) => {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new NotFoundError('User not found');
   return user;
 };
+
+export const getActiveOrdersCount = async (userId: number) =>
+  prisma.order.count({
+    where: {
+      userId,
+      status: { in: ACTIVE_ORDER_STATUSES },
+    },
+  });
 
 export const updateUser = async (id: number, input: UpdateProfileInput) => {
   const user = await getUserById(id);
@@ -60,7 +87,14 @@ export const getAllUsers = async (query: UserQuery) => {
     prisma.user.count({ where }),
   ]);
 
-  return { users, total, page, limit };
+  const activeOrderCountMap = await getActiveOrderCountMap(users.map(user => user.id));
+
+  const usersWithDeletionState = users.map(user => ({
+    ...user,
+    activeOrdersCount: activeOrderCountMap.get(user.id) ?? 0,
+  }));
+
+  return { users: usersWithDeletionState, total, page, limit };
 };
 
 export const adminUpdateUser = async (id: number, input: AdminUpdateUserInput) => {
@@ -89,16 +123,46 @@ export const deleteUser = async (id: number) => {
   if (!user) throw new NotFoundError('User not found');
   if (user.role === 'ADMIN') throw new ValidationError('Cannot delete an admin user');
 
-  const [orderCount, paymentCount] = await Promise.all([
-    prisma.order.count({ where: { userId: id } }),
-    prisma.payment.count({ where: { userId: id } }),
-  ]);
-
-  if (orderCount > 0 || paymentCount > 0) {
-    throw new ValidationError('Cannot delete a user with existing orders or payments');
-  }
-
   await prisma.$transaction(async tx => {
+    const activeOrdersCount = await tx.order.count({
+      where: {
+        userId: id,
+        status: { in: ACTIVE_ORDER_STATUSES },
+      },
+    });
+
+    if (activeOrdersCount > 0) {
+      throw new ValidationError('User has active orders and cannot be deleted');
+    }
+
+    await tx.payment.deleteMany({
+      where: { userId: id },
+    });
+
+    await tx.orderItemExtra.deleteMany({
+      where: {
+        orderItem: {
+          order: { userId: id },
+        },
+      },
+    });
+
+    await tx.orderItem.deleteMany({
+      where: {
+        order: { userId: id },
+      },
+    });
+
+    await tx.orderIngredientItem.deleteMany({
+      where: {
+        order: { userId: id },
+      },
+    });
+
+    await tx.order.deleteMany({
+      where: { userId: id },
+    });
+
     await tx.cartItemExtra.deleteMany({ where: { cartItem: { cart: { userId: id } } } });
     await tx.cartItem.deleteMany({ where: { cart: { userId: id } } });
     await tx.cartIngredientItem.deleteMany({ where: { cart: { userId: id } } });

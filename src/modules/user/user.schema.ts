@@ -1,12 +1,10 @@
 import { z } from 'zod';
+import { POLISH_PHONE_REGEX } from '../auth/auth.schema';
 
 export const updateProfileSchema = z
   .object({
     name: z.string().min(1).optional(),
-    phone: z
-      .string()
-      .regex(/^\+?[0-9\s\-().]{7,20}$/, 'Invalid phone number')
-      .optional(),
+    phone: z.string().regex(POLISH_PHONE_REGEX, 'Enter a valid Polish phone number (e.g. +48 123 456 789)').optional(),
     password: z.string().min(6).optional(),
     currentPassword: z.string().min(6).optional(),
   })
@@ -19,10 +17,7 @@ export const updateProfileSchema = z
 export const adminUpdateUserSchema = z
   .object({
     name: z.string().min(1).optional(),
-    phone: z
-      .string()
-      .regex(/^\+?[0-9\s\-().]{7,20}$/, 'Invalid phone number')
-      .optional(),
+    phone: z.string().regex(POLISH_PHONE_REGEX, 'Enter a valid Polish phone number').optional(),
     password: z.string().min(6).optional(),
     role: z.enum(['USER', 'ADMIN']).optional(),
   })

@@ -26,7 +26,7 @@ const httpLogger = pinoHttp({ logger });
 useHandlers(app, httpLogger, express.json(), cookieParser());
 
 app.get('/', (_req, res) => {
-  res.redirect('/api-docs');
+  res.redirect('/health');
 });
 
 app.get('/health', (_req, res) => {

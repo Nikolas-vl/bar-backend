@@ -7,8 +7,8 @@ import { getMyProfile, updateMyProfile, adminGetAllUsers, adminGetUserById, admi
 const router = Router();
 
 // ─── User routes ───────────────────────────────────────────────────────────
-router.get('/me', getMyProfile);
-router.patch('/me', validate(updateProfileSchema), updateMyProfile);
+router.get('/profile', getMyProfile);
+router.patch('/profile', validate(updateProfileSchema), updateMyProfile);
 
 // ─── Admin routes ──────────────────────────────────────────────────────────
 router.get('/admin/all', requireRole('ADMIN'), validate(userQuerySchema, 'query'), adminGetAllUsers);
