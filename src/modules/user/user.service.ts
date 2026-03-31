@@ -89,13 +89,17 @@ export const deleteUser = async (id: number) => {
   if (!user) throw new NotFoundError('User not found');
   if (user.role === 'ADMIN') throw new ValidationError('Cannot delete an admin user');
 
-  const [orderCount, paymentCount] = await Promise.all([
-    prisma.order.count({ where: { userId: id } }),
-    prisma.payment.count({ where: { userId: id } }),
-  ]);
+  const activeOrdersCount = await prisma.order.count({
+    where: {
+      userId: id,
+      status: {
+        in: ['NEW', 'PAID', 'PREPARING'],
+      },
+    },
+  });
 
-  if (orderCount > 0 || paymentCount > 0) {
-    throw new ValidationError('Cannot delete a user with existing orders or payments');
+  if (activeOrdersCount > 0) {
+    throw new ValidationError('Cannot delete user with active orders');
   }
 
   await prisma.$transaction(async tx => {

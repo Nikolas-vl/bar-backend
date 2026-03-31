@@ -10,24 +10,23 @@ export const dishIngredientSchema = z
   })
   .strict();
 
-// Create dish schema
-export const createDishSchema = z
-  .object({
-    name: z.string().min(2).max(100),
-    description: z.string().max(500).optional(),
-    price: z.number().positive(),
-    imageUrl: z.url().optional(),
-    calories: z.number().int().positive().optional(),
-    protein: z.number().positive().optional(),
-    fat: z.number().positive().optional(),
-    carbs: z.number().positive().optional(),
-    category: z.enum(Category).optional(),
-    isAvailable: z.boolean().optional(),
-    ingredients: z.array(dishIngredientSchema).optional(),
-  })
-  .strict();
+const dishFields = {
+  name: z.string().min(2).max(100),
+  description: z.string().max(500).optional(),
+  price: z.number().positive(),
+  imageUrl: z.string().url().optional(),
+  calories: z.number().int().positive().optional(),
+  protein: z.number().positive().optional(),
+  fat: z.number().positive().optional(),
+  carbs: z.number().positive().optional(),
+  category: z.enum(Category).optional(),
+  isAvailable: z.boolean().optional(),
+  ingredients: z.array(dishIngredientSchema).optional(),
+};
 
-export const updateDishSchema = createDishSchema.partial();
+export const createDishSchema = z.object(dishFields).strict();
+
+export const updateDishSchema = z.object(dishFields).partial();
 
 export const dishQuerySchema = z.object({
   search: z.string().optional(),

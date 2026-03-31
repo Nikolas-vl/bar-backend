@@ -199,16 +199,16 @@ npm start
 
 ## 📡 API Overview
 
-| Domain       | Endpoint        | Method   | Auth  |
-| ------------ | --------------- | -------- | ----- |
-| Auth         | `/auth/login`   | POST     | ❌    |
-| Auth         | `/auth/refresh` | POST     | ❌    |
-| Users        | `/users/me`     | GET      | ✅    |
-| Cart         | `/cart`         | GET/POST | ✅    |
-| Orders       | `/orders`       | GET/POST | ✅    |
-| Reservations | `/reservations` | CRUD     | ✅    |
-| Dishes       | `/dishes`       | GET      | ❌    |
-| Admin        | `/admin/*`      | various  | ADMIN |
+| Domain       | Endpoint         | Method   | Auth  |
+| ------------ | ---------------- | -------- | ----- |
+| Auth         | `/auth/login`    | POST     | ❌    |
+| Auth         | `/auth/refresh`  | POST     | ❌    |
+| Users        | `/users/profile` | GET      | ✅    |
+| Cart         | `/cart`          | GET/POST | ✅    |
+| Orders       | `/orders`        | GET/POST | ✅    |
+| Reservations | `/reservations`  | CRUD     | ✅    |
+| Dishes       | `/dishes`        | GET      | ❌    |
+| Admin        | `/admin/*`       | various  | ADMIN |
 
 ---
 
