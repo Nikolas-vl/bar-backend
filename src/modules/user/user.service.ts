@@ -19,6 +19,7 @@ export const updateUser = async (id: number, input: UpdateProfileInput) => {
   if (input.phone !== undefined) data.phone = input.phone;
 
   if (input.password !== undefined) {
+    if (!user.password) throw new ValidationError('Cannot change password for OAuth accounts');
     const isMatch = await bcrypt.compare(input.currentPassword!, user.password);
     if (!isMatch) throw new ValidationError('Current password is incorrect');
     data.password = await bcrypt.hash(input.password, 10);

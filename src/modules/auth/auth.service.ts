@@ -22,6 +22,8 @@ export const findUserByEmail = (email: string) => {
       name: true,
       phone: true,
       role: true,
+      provider: true,
+      googleId: true,
       refreshToken: true,
     },
   });
@@ -61,7 +63,7 @@ export const registerUser = async (input: RegisterInput) => {
 
 export const loginUser = async (input: LoginInput) => {
   const user = await findUserByEmail(input.email);
-  if (!user) throw new UnauthorizedError('Invalid credentials');
+  if (!user || !user.password) throw new UnauthorizedError('Invalid credentials');
 
   const isValid = await bcrypt.compare(input.password, user.password);
   if (!isValid) throw new UnauthorizedError('Invalid credentials');
