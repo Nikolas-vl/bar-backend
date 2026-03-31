@@ -2,6 +2,7 @@ import prisma from '../../prisma';
 import { ReservationStatus } from '../../generated/prisma/client';
 import { NotFoundError, ValidationError } from '../../utils/errors';
 import { sendReservationConfirmation } from '../../utils/mailer';
+import { getSettings } from '../settings/settings.service';
 import { CreateReservationInput, AdminCreateReservationInput, AdminUpdateReservationInput, ReservationQuery } from './reservation.schema';
 
 const SLOT_DURATION_MS = 2 * 60 * 60 * 1000; // 2 hours
@@ -190,6 +191,7 @@ export const adminUpdateReservation = async (id: number, input: AdminUpdateReser
 
   // Send confirmation email when status changes to CONFIRMED
   if (input.status === ReservationStatus.CONFIRMED && updated.table) {
+    const settings = await getSettings();
     await sendReservationConfirmation({
       to: reservation.user.email,
       name: reservation.user.name ?? 'Guest',
@@ -198,6 +200,7 @@ export const adminUpdateReservation = async (id: number, input: AdminUpdateReser
       tableNumber: updated.table.number,
       locationName: updated.table.location.name,
       locationAddress: updated.table.location.address,
+      restaurantName: settings.restaurantName,
       preOrders: updated.preOrders.map(p => ({
         dishName: p.dish.name,
         quantity: p.quantity,

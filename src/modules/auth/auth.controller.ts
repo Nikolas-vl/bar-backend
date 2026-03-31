@@ -1,9 +1,11 @@
 import { Request, Response } from 'express';
 import { registerUser, loginUser, refreshSession, updateRefreshToken } from './auth.service';
+import { getGoogleAuthUrl, handleGoogleCallback } from './google.service';
 import { UnauthorizedError } from '../../utils/errors';
 import { verifyRefreshToken } from '../../utils/jwt';
 
 const isProd = process.env.NODE_ENV === 'production';
+const FRONTEND_URL = process.env.FRONTEND_URL!;
 
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
@@ -67,4 +69,27 @@ export const logout = async (req: Request, res: Response) => {
   res.clearCookie('refreshToken', REFRESH_COOKIE_OPTIONS);
 
   res.json({ message: 'User successfully logged out' });
+};
+
+export const googleRedirect = (_req: Request, res: Response) => {
+  const url = getGoogleAuthUrl();
+  res.redirect(url);
+};
+
+export const googleCallback = async (req: Request, res: Response) => {
+  const code = req.query.code as string | undefined;
+
+  if (!code) {
+    res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
+    return;
+  }
+
+  try {
+    const { accessToken, refreshToken } = await handleGoogleCallback(code);
+
+    res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
+    res.redirect(`${FRONTEND_URL}/auth/google/success?accessToken=${accessToken}`);
+  } catch {
+    res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
+  }
 };
