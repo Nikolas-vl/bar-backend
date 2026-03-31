@@ -45,6 +45,7 @@ export const adminGetUserById = async (req: Request, res: Response) => {
   req.log.info({ userId }, 'Admin fetching user');
 
   const user = await service.getUserById(userId);
+  const activeOrdersCount = await service.getActiveOrdersCount(userId);
 
   res.json({
     id: user.id,
@@ -53,6 +54,7 @@ export const adminGetUserById = async (req: Request, res: Response) => {
     phone: user.phone,
     role: user.role,
     createdAt: user.createdAt,
+    activeOrdersCount,
   });
 };
 
