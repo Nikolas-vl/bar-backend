@@ -290,13 +290,24 @@ export const updateOrderStatus = async (orderId: number, input: UpdateOrderStatu
 
   if (!order) throw new NotFoundError('Order not found');
 
-  const paymentStatusPatch =
-    input.status === OrderStatus.PAID && order.paymentStatus !== PaymentStatus.FAILED ? { paymentStatus: PaymentStatus.SUCCESS } : {};
+  const shouldMarkPaymentSuccess = input.status === OrderStatus.PAID && order.paymentStatus !== PaymentStatus.FAILED;
 
-  return prisma.order.update({
-    where: { id: orderId },
-    data: { status: input.status, ...paymentStatusPatch },
-    include: orderInclude,
+  return prisma.$transaction(async tx => {
+    if (shouldMarkPaymentSuccess) {
+      await tx.payment.updateMany({
+        where: { orderId, status: PaymentStatus.PENDING },
+        data: { status: PaymentStatus.SUCCESS },
+      });
+    }
+
+    return tx.order.update({
+      where: { id: orderId },
+      data: {
+        status: input.status,
+        ...(shouldMarkPaymentSuccess ? { paymentStatus: PaymentStatus.SUCCESS } : {}),
+      },
+      include: orderInclude,
+    });
   });
 };
 
