@@ -4,6 +4,7 @@ import { OrderStatus, PaymentStatus, PaymentType } from '../../generated/prisma/
 import { NotFoundError, ValidationError } from '../../utils/errors';
 import { CreateOrderInput, UpdateOrderStatusInput, PayOrderInput, OrderQuery } from './order.schema';
 import { calcFinalTotal } from '../../utils/pricing';
+import { emitOrderStatusUpdate, emitNewOrderToAdmins } from '../../lib/socket/events';
 
 const orderInclude = {
   items: {
@@ -124,6 +125,14 @@ export const createOrder = async (userId: number, input: CreateOrderInput) => {
 
     await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
     await tx.cartIngredientItem.deleteMany({ where: { cartId: cart.id } });
+
+    emitNewOrderToAdmins({
+      orderId: order.id,
+      userId,
+      type: order.type,
+      total: order.total.toString(),
+      itemCount: cart.items.length,
+    });
 
     return order;
   });
@@ -287,7 +296,6 @@ export const getOrderById = async (orderId: number) => {
 
 export const updateOrderStatus = async (orderId: number, input: UpdateOrderStatusInput) => {
   const order = await prisma.order.findUnique({ where: { id: orderId } });
-
   if (!order) throw new NotFoundError('Order not found');
 
   const shouldMarkPaymentSuccess = input.status === OrderStatus.PAID && order.paymentStatus !== PaymentStatus.FAILED;
@@ -300,7 +308,7 @@ export const updateOrderStatus = async (orderId: number, input: UpdateOrderStatu
       });
     }
 
-    return tx.order.update({
+    const updated = await tx.order.update({
       where: { id: orderId },
       data: {
         status: input.status,
@@ -308,6 +316,14 @@ export const updateOrderStatus = async (orderId: number, input: UpdateOrderStatu
       },
       include: orderInclude,
     });
+
+    emitOrderStatusUpdate(updated.userId, {
+      orderId: updated.id,
+      status: updated.status,
+      updatedAt: new Date().toISOString(),
+    });
+
+    return updated;
   });
 };
 

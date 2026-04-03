@@ -4,6 +4,7 @@ import { NotFoundError, ValidationError } from '../../utils/errors';
 import { sendReservationConfirmation } from '../../utils/mailer';
 import { getSettings } from '../settings/settings.service';
 import { CreateReservationInput, AdminCreateReservationInput, AdminUpdateReservationInput, ReservationQuery } from './reservation.schema';
+import { emitReservationStatusUpdate, emitNewReservationToAdmins } from '../../lib/socket/events';
 
 const SLOT_DURATION_MS = 2 * 60 * 60 * 1000; // 2 hours
 
@@ -47,7 +48,7 @@ export const createReservation = async (userId: number, input: CreateReservation
     await validatePreOrders(input.preOrders);
   }
 
-  return prisma.reservation.create({
+  const reservation = await prisma.reservation.create({
     data: {
       userId,
       date: input.date,
@@ -59,6 +60,15 @@ export const createReservation = async (userId: number, input: CreateReservation
     },
     include: reservationInclude,
   });
+
+  emitNewReservationToAdmins({
+    reservationId: reservation.id,
+    userId,
+    date: reservation.date.toISOString(),
+    guests: reservation.guests,
+  });
+
+  return reservation;
 };
 
 export const getMyReservations = async (userId: number) => {
@@ -207,6 +217,13 @@ export const adminUpdateReservation = async (id: number, input: AdminUpdateReser
       })),
     });
   }
+
+  emitReservationStatusUpdate(reservation.userId, {
+    reservationId: updated.id,
+    status: updated.status,
+    tableId: updated.tableId,
+    updatedAt: new Date().toISOString(),
+  });
 
   return updated;
 };

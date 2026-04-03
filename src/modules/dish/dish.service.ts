@@ -3,9 +3,9 @@ import { Prisma } from '../../generated/prisma/client';
 import { CreateDish, DishQuery, UpdateDish, AddIngredientToDish, UpdateDishIngredient } from './dish.schema';
 import { buildDishWhere } from './dish.utils';
 import { NotFoundError } from '../../utils/errors';
-import cloudinary from '../../utils/cloudinary';
+import cloudinary from '../../lib/cloudinary/cloudinary';
 import { logger } from '../../utils/logger';
-import { optimizedUrl } from '../../utils/uploadToCloudinary';
+import { optimizedUrl } from '../../lib/cloudinary/uploadToCloudinary';
 import { Dish } from '../../generated/prisma/client';
 
 const dishInclude = {

@@ -54,7 +54,7 @@ Built with a strong focus on:
 | ORM        | Prisma 7 (`@prisma/adapter-pg`)  |
 | Database   | PostgreSQL                       |
 | Validation | Zod                              |
-| Auth       | JWT (access + refresh)           |
+| Auth       | JWT (access + refresh) + OAuth   |
 | Hashing    | bcrypt                           |
 | Logging    | Pino + pino-http                 |
 | Email      | Nodemailer (Ethereal)            |
@@ -117,17 +117,31 @@ Response
 
 ---
 
-## 🔐 Authentication
+## 🔐 Authentication System
 
-- JWT-based authentication:
-  - **Access Token** (short-lived)
-  - **Refresh Token** (rotation-based)
+- **JWT-based authentication**:
+  - Access Token (short-lived)
+  - Refresh Token (rotation-based)
+  - Refresh tokens stored server-side for session control
 
-- Refresh tokens stored server-side for session control
+- **OAuth Integration (Google)**:
+  - Secure OAuth flow handled by backend
+  - On successful OAuth login, backend issues JWT tokens
+  - Unified session handling for both OAuth and credentials-based users
 
-- RBAC (Role-Based Access Control):
+- **RBAC (Role-Based Access Control)**:
   - `USER`
   - `ADMIN`
+
+---
+
+## 🖼 Media Handling
+
+- **Cloudinary Integration**:
+  - Image upload for dishes and ingredients
+  - Server-side upload handling (no direct client exposure)
+  - Automatic image optimization and CDN delivery
+  - Secure upload configuration via environment variables
 
 ---
 
@@ -228,28 +242,29 @@ npm start
   - Eliminates repetitive param validation logic
 - **Ownership middleware (`ownsResource`)**
   - Generic authorization guard across domains
+- **OAuth + JWT Hybrid Auth**
+  - Combines social login with token-based session management
+  - Backend issues JWT after OAuth flow for unified handling
+- **Cloudinary for Media Storage**
+  - Offloads file storage and optimization to a CDN-backed service
+  - Reduces backend load and simplifies media delivery
 
 ---
 
 ## ⚠️ Limitations
 
-- Email uses Ethereal (dev only)
 - Payments are simulated
 - No real-time updates (no WebSockets/SSE)
 - Rate limiting is currently disabled
-- No file/image upload support
 
 ---
 
 ## 🛣 Roadmap
 
-- OAuth (Google)
 - Redis caching layer
 - Real payment integration (Stripe)
-- Real SMTP provider (Resend / SendGrid)
 - WebSocket/SSE for real-time updates
 - Shared schema package (frontend + backend)
-- Cloudinary for image uploads
 - Integration & E2E tests
 
 ---
