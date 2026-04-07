@@ -7,6 +7,13 @@ import cloudinary from '../../lib/cloudinary/cloudinary';
 import { logger } from '../../utils/logger';
 import { optimizedUrl } from '../../lib/cloudinary/uploadToCloudinary';
 import { Dish } from '../../generated/prisma/client';
+import { withCache, cacheInvalidatePattern, cacheDelete } from '../../lib/redis/cache';
+import { CacheKeys, CacheTTL } from '../../lib/redis/cache.keys';
+
+function queryHash(query?: DishQuery): string {
+  if (!query || Object.keys(query).length === 0) return 'default';
+  return Buffer.from(JSON.stringify(query)).toString('base64url');
+}
 
 const dishInclude = {
   ingredients: {
@@ -16,13 +23,17 @@ const dishInclude = {
   },
 } satisfies Prisma.DishInclude;
 
-export const getAllDishes = (query?: DishQuery) => {
-  return prisma.dish.findMany({
-    where: buildDishWhere(query),
-    orderBy: query?.sortBy ? { [query.sortBy]: query.sortOrder ?? 'asc' } : { name: 'asc' },
-    include: dishInclude,
-  });
-};
+export const getAllDishes = (query?: DishQuery) =>
+  withCache(
+    CacheKeys.dishes.list(queryHash(query)),
+    () =>
+      prisma.dish.findMany({
+        where: buildDishWhere(query),
+        orderBy: query?.sortBy ? { [query.sortBy]: query.sortOrder ?? 'asc' } : { name: 'asc' },
+        include: { ingredients: { include: { ingredient: true } } },
+      }),
+    { ttl: CacheTTL.MEDIUM },
+  );
 
 export const getDishById = async (id: number) => {
   const dish = await prisma.dish.findUnique({
@@ -33,10 +44,25 @@ export const getDishById = async (id: number) => {
   return dish;
 };
 
-export const createDish = (data: CreateDish) => {
-  const { ingredients, ...dishData } = data;
+// export const createDish = (data: CreateDish) => {
+//   const { ingredients, ...dishData } = data;
 
-  return prisma.dish.create({
+//   return prisma.dish.create({
+//     data: {
+//       ...dishData,
+//       ingredients: ingredients
+//         ? {
+//             create: ingredients,
+//           }
+//         : undefined,
+//     },
+//     include: dishInclude,
+//   });
+// };
+
+export const createDish = async (data: CreateDish) => {
+  const { ingredients, ...dishData } = data;
+  const dish = prisma.dish.create({
     data: {
       ...dishData,
       ingredients: ingredients
@@ -47,6 +73,8 @@ export const createDish = (data: CreateDish) => {
     },
     include: dishInclude,
   });
+  await cacheInvalidatePattern(CacheKeys.dishes.all);
+  return dish;
 };
 
 export const updateDish = async (id: number, data: UpdateDish) => {
@@ -59,7 +87,7 @@ export const updateDish = async (id: number, data: UpdateDish) => {
       include: dishInclude,
     });
   }
-  return prisma.dish.update({
+  const dish = await prisma.dish.update({
     where: { id },
     data: {
       ...dishData,
@@ -72,12 +100,16 @@ export const updateDish = async (id: number, data: UpdateDish) => {
     },
     include: dishInclude,
   });
+  await cacheInvalidatePattern(CacheKeys.dishes.all);
+  return dish;
 };
 
-export const deleteDish = (id: number) => {
-  return prisma.dish.delete({
+export const deleteDish = async (id: number) => {
+  const dish = await prisma.dish.delete({
     where: { id },
   });
+  await cacheInvalidatePattern(CacheKeys.dishes.all);
+  return dish;
 };
 
 export const addIngredientToDish = (dishId: number, data: AddIngredientToDish) => {

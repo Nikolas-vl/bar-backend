@@ -8,7 +8,7 @@ import { logger } from '../../utils/logger';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_AUTH_CLIENT_ID!;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_AUTH_CLIENT_SECRET!;
-const BACKEND_URL = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 4000}`;
+const BACKEND_URL = process.env.BACKEND_URL || `http://localhost:${process.env.BACKEND_PORT || 4000}`;
 const GOOGLE_REDIRECT_URI = `${BACKEND_URL}/auth/google/callback`;
 
 const oauthClient = new OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI);
