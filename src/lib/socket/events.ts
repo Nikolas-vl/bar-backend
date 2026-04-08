@@ -5,6 +5,10 @@ export const emitOrderStatusUpdate = (userId: number, payload: OrderStatusPayloa
   getIO().to(`user:${userId}`).emit('order:status_updated', payload);
 };
 
+export const emitOrderStatusUpdateToAdmins = (payload: OrderStatusPayload) => {
+  getIO().to('room:admin').emit('order:status_updated', payload);
+};
+
 export const emitNewOrderToAdmins = (payload: NewOrderPayload) => {
   getIO().to('room:admin').emit('order:new', payload);
 };

@@ -35,9 +35,6 @@ export async function cacheSet<T>(key: string, value: T, options: CacheOptions =
   } catch (err) {
     logger.error({ err, key }, 'Cache SET failed');
   }
-
-  console.log('CACHE MISS', key);
-  console.log('CACHE HIT', key);
 }
 
 /**
@@ -53,8 +50,6 @@ export async function cacheDelete(key: string): Promise<void> {
 
 /**
  * Delete all keys matching a glob pattern.
- *
- * Example: cacheInvalidatePattern('dishes:*')
  */
 export async function cacheInvalidatePattern(pattern: string): Promise<void> {
   try {
@@ -76,7 +71,7 @@ export async function cacheInvalidatePattern(pattern: string): Promise<void> {
  * Cache-aside helper.
  * Tries cache first → on miss, calls `fetchFn` → stores result.
  *
- * @example
+ * example
  * const dishes = await withCache('dishes:all', () => prisma.dish.findMany(), { ttl: 60 });
  */
 export async function withCache<T>(key: string, fetchFn: () => Promise<T>, options: CacheOptions = {}): Promise<T> {

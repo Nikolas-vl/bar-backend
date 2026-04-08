@@ -116,6 +116,9 @@ model Dish {
   orderItems           OrderItem[]
   cartItems            CartItem[]
   reservationPreOrders ReservationPreOrder[]
+
+  @@index([category, isAvailable])
+  @@index([name])
 }
 
 model Ingredient {
@@ -190,6 +193,7 @@ model Order {
   @@index([status])
   @@index([createdAt])
   @@index([addressId])
+  @@index([userId, status])
 }
 
 model OrderItem {
@@ -338,6 +342,7 @@ model Payment {
 
   @@index([orderId])
   @@index([userId])
+  @@index([orderId, status])
 }
 
 model Location {

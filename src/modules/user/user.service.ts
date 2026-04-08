@@ -3,6 +3,7 @@ import prisma from '../../prisma';
 import { Prisma, OrderStatus } from '../../generated/prisma/client';
 import { NotFoundError, ValidationError } from '../../utils/errors';
 import { UpdateProfileInput, AdminUpdateUserInput, UserQuery } from './user.schema';
+import { updateRefreshToken } from '../auth/auth.service';
 
 const ACTIVE_ORDER_STATUSES: OrderStatus[] = [OrderStatus.NEW, OrderStatus.PAID, OrderStatus.PREPARING];
 
@@ -52,7 +53,7 @@ export const updateUser = async (id: number, input: UpdateProfileInput) => {
     data.password = await bcrypt.hash(input.password, 10);
   }
 
-  return prisma.user.update({
+  const updated = await prisma.user.update({
     where: { id },
     data,
     select: {
@@ -63,6 +64,12 @@ export const updateUser = async (id: number, input: UpdateProfileInput) => {
       role: true,
     },
   });
+
+  if (input.password !== undefined) {
+    await updateRefreshToken(id, null);
+  }
+
+  return updated;
 };
 
 export const getAllUsers = async (query: UserQuery) => {
@@ -125,52 +132,37 @@ export const deleteUser = async (id: number) => {
 
   await prisma.$transaction(async tx => {
     const activeOrdersCount = await tx.order.count({
-      where: {
-        userId: id,
-        status: { in: ACTIVE_ORDER_STATUSES },
-      },
+      where: { userId: id, status: { in: ACTIVE_ORDER_STATUSES } },
     });
-
     if (activeOrdersCount > 0) {
       throw new ValidationError('User has active orders and cannot be deleted');
     }
 
-    await tx.payment.deleteMany({
-      where: { userId: id },
-    });
+    // Level 1 — leaf nodes (no FK children)
+    await Promise.all([
+      tx.payment.deleteMany({ where: { userId: id } }),
+      tx.orderItemExtra.deleteMany({ where: { orderItem: { order: { userId: id } } } }),
+      tx.cartItemExtra.deleteMany({ where: { cartItem: { cart: { userId: id } } } }),
+      tx.reservationPreOrder.deleteMany({ where: { reservation: { userId: id } } }),
+    ]);
 
-    await tx.orderItemExtra.deleteMany({
-      where: {
-        orderItem: {
-          order: { userId: id },
-        },
-      },
-    });
+    // Level 2 — depends on level 1
+    await Promise.all([
+      tx.orderItem.deleteMany({ where: { order: { userId: id } } }),
+      tx.orderIngredientItem.deleteMany({ where: { order: { userId: id } } }),
+      tx.cartIngredientItem.deleteMany({ where: { cart: { userId: id } } }),
+      tx.reservation.deleteMany({ where: { userId: id } }),
+    ]);
 
-    await tx.orderItem.deleteMany({
-      where: {
-        order: { userId: id },
-      },
-    });
+    // Level 3 — depends on level 2
+    await Promise.all([tx.order.deleteMany({ where: { userId: id } }), tx.cartItem.deleteMany({ where: { cart: { userId: id } } })]);
 
-    await tx.orderIngredientItem.deleteMany({
-      where: {
-        order: { userId: id },
-      },
-    });
-
-    await tx.order.deleteMany({
-      where: { userId: id },
-    });
-
-    await tx.cartItemExtra.deleteMany({ where: { cartItem: { cart: { userId: id } } } });
-    await tx.cartItem.deleteMany({ where: { cart: { userId: id } } });
-    await tx.cartIngredientItem.deleteMany({ where: { cart: { userId: id } } });
+    // Level 4 — depends on level 3
     await tx.cart.deleteMany({ where: { userId: id } });
-    await tx.address.deleteMany({ where: { userId: id } });
-    await tx.paymentMethod.deleteMany({ where: { userId: id } });
-    await tx.reservationPreOrder.deleteMany({ where: { reservation: { userId: id } } });
-    await tx.reservation.deleteMany({ where: { userId: id } });
+
+    // Level 5 — independent of each other, depend on user
+    await Promise.all([tx.address.deleteMany({ where: { userId: id } }), tx.paymentMethod.deleteMany({ where: { userId: id } })]);
+
     await tx.user.delete({ where: { id } });
   });
 };

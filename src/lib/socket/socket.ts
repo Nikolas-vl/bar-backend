@@ -2,6 +2,9 @@ import { Server as HttpServer } from 'http';
 import { Server as SocketServer, Socket } from 'socket.io';
 import { verifyAccessToken } from '../../utils/jwt';
 import { logger } from '../../utils/logger';
+import redis from '../redis/redis.client';
+import { createAdapter } from '@socket.io/redis-adapter';
+import Redis from 'ioredis';
 
 export type SocketRole = 'USER' | 'ADMIN';
 
@@ -11,8 +14,10 @@ interface AuthenticatedSocket extends Socket {
 }
 
 let io: SocketServer;
+export let pubClient: Redis;
+export let subClient: Redis;
 
-export const initSocket = (httpServer: HttpServer): SocketServer => {
+export const initSocket = async (httpServer: HttpServer): Promise<SocketServer> => {
   io = new SocketServer(httpServer, {
     cors: {
       origin: process.env.CORS_ORIGIN?.split(','),
@@ -20,6 +25,13 @@ export const initSocket = (httpServer: HttpServer): SocketServer => {
     },
     transports: ['websocket', 'polling'],
   });
+
+  pubClient = redis.duplicate();
+  subClient = redis.duplicate();
+  pubClient.on('error', err => logger.error({ err }, 'Socket.IO pub client error'));
+  subClient.on('error', err => logger.error({ err }, 'Socket.IO sub client error'));
+  io.adapter(createAdapter(pubClient, subClient));
+  logger.info('Socket.IO Redis adapter initialised');
 
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token as string | undefined;

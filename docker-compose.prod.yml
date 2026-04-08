@@ -1,0 +1,21 @@
+# ──────────────────────────────────────────────────────────
+# docker-compose.prod.yml  —  PRODUCTION OVERRIDES
+#
+# Apply on top of docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# This file overrides the backend service to:
+#   - Remove the source bind-mount (no source code in container)
+#   - Use the compiled Dockerfile CMD (prisma migrate + node dist/)
+#   - Set NODE_ENV=production
+#   - Disable ts-node-dev hot re*load
+# ──────────────────────────────────────────────────────────
+services:
+  backend:
+    # No source bind-mount — image contains only the compiled dist/
+    volumes: []
+    # command is intentionally omitted so Docker falls back to the Dockerfile CMD:
+    #   npx prisma migrate deploy && node dist/index.js
+    environment:
+      NODE_ENV: production
+    restart: always

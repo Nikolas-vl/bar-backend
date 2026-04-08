@@ -1,8 +1,9 @@
 import http from 'http';
 import app from './app';
 import { logger } from './utils/logger';
-import { initSocket } from './lib/socket/socket';
+import { initSocket, getIO, pubClient, subClient } from './lib/socket/socket';
 import redis, { disconnectRedis } from './lib/redis/redis.client';
+import prisma from './prisma';
 
 const BACKEND_PORT = process.env.BACKEND_PORT || 4000;
 
@@ -15,21 +16,25 @@ async function bootstrap() {
   }
 
   const httpServer = http.createServer(app);
-  initSocket(httpServer);
+  await initSocket(httpServer);
 
   httpServer.listen(Number(BACKEND_PORT), '0.0.0.0', () => {
     logger.info(`Server running on http://localhost:${BACKEND_PORT}`);
     logger.info(`Swagger docs available at http://localhost:${BACKEND_PORT}/api-docs`);
     logger.info(`Redis port: ${process.env.REDIS_PORT}`);
-    logger.info(`PSQL url: ${process.env.DATABASE_URL}`);
   });
 
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'Shutdown signal received');
 
+    getIO().close();
+
     httpServer.close(async () => {
+      await pubClient.quit();
+      await subClient.quit();
       await disconnectRedis();
-      logger.info('HTTP server + Redis closed. Bye');
+      await prisma.$disconnect();
+      logger.info('HTTP server + Redis + DB closed. Bye');
       process.exit(0);
     });
 
