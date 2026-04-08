@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { register, login, refresh, logout, googleRedirect, googleCallback } from './auth.controller';
+import { register, login, refresh, logout, googleRedirect, googleCallback, googleExchange } from './auth.controller';
 import { validate } from '../../middlewares/validate';
 import { registerSchema, loginSchema } from './auth.schema';
 
@@ -13,5 +13,6 @@ router.post('/logout', logout);
 
 router.get('/google', googleRedirect);
 router.get('/google/callback', googleCallback);
+router.get('/google/exchange', googleExchange);
 
 export default router;

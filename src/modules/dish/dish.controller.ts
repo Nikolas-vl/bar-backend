@@ -13,7 +13,7 @@ import {
 } from './dish.service';
 import { DishQuery } from './dish.schema';
 import { paramSchema } from '../../utils/common.schema';
-import { uploadImage } from '../../utils/uploadToCloudinary';
+import { uploadImage } from '../../lib/cloudinary/uploadToCloudinary';
 
 export const getDishes = async (req: Request, res: Response) => {
   req.log.info({ query: req.query }, 'Fetching dishes');

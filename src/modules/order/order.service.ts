@@ -4,6 +4,15 @@ import { OrderStatus, PaymentStatus, PaymentType } from '../../generated/prisma/
 import { NotFoundError, ValidationError } from '../../utils/errors';
 import { CreateOrderInput, UpdateOrderStatusInput, PayOrderInput, OrderQuery } from './order.schema';
 import { calcFinalTotal } from '../../utils/pricing';
+import { emitOrderStatusUpdate, emitNewOrderToAdmins, emitOrderStatusUpdateToAdmins } from '../../lib/socket/events';
+
+const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  [OrderStatus.NEW]: [OrderStatus.PAID, OrderStatus.CANCELED],
+  [OrderStatus.PAID]: [OrderStatus.PREPARING, OrderStatus.CANCELED],
+  [OrderStatus.PREPARING]: [OrderStatus.COMPLETED, OrderStatus.CANCELED],
+  [OrderStatus.COMPLETED]: [],
+  [OrderStatus.CANCELED]: [],
+};
 
 const orderInclude = {
   items: {
@@ -125,6 +134,14 @@ export const createOrder = async (userId: number, input: CreateOrderInput) => {
     await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
     await tx.cartIngredientItem.deleteMany({ where: { cartId: cart.id } });
 
+    emitNewOrderToAdmins({
+      orderId: order.id,
+      userId,
+      type: order.type,
+      total: order.total.toString(),
+      itemCount: cart.items.length,
+    });
+
     return order;
   });
 };
@@ -175,11 +192,25 @@ export const cancelOrder = async (userId: number, orderId: number) => {
     throw new ValidationError(`Cannot cancel an order with status: ${order.status}`);
   }
 
-  return prisma.order.update({
+  const updated = await prisma.order.update({
     where: { id: orderId },
     data: { status: OrderStatus.CANCELED },
     include: orderInclude,
   });
+
+  emitOrderStatusUpdate(updated.userId, {
+    orderId: updated.id,
+    status: updated.status,
+    updatedAt: new Date().toISOString(),
+  });
+
+  emitOrderStatusUpdateToAdmins({
+    orderId: updated.id,
+    status: updated.status,
+    updatedAt: new Date().toISOString(),
+  });
+
+  return updated;
 };
 
 export const payOrder = async (userId: number, orderId: number, input: PayOrderInput) => {
@@ -205,14 +236,16 @@ export const payOrder = async (userId: number, orderId: number, input: PayOrderI
   }
 
   const isCash = input.type === PaymentType.CASH;
-
-  const simulatedStatus: PaymentStatus = isCash
-    ? PaymentStatus.PENDING
-    : input.type === PaymentType.BLIK && Math.random() < 0.1
-      ? PaymentStatus.FAILED
-      : PaymentStatus.SUCCESS;
+  const simulatedStatus: PaymentStatus = isCash ? PaymentStatus.PENDING : PaymentStatus.SUCCESS;
 
   return prisma.$transaction(async tx => {
+    const existing = await tx.payment.findFirst({
+      where: { orderId, userId, type: input.type, status: { not: PaymentStatus.FAILED } },
+    });
+    if (existing) {
+      throw new ValidationError('A payment for this order is already in progress');
+    }
+
     const payment = await tx.payment.create({
       data: {
         orderId,
@@ -237,11 +270,7 @@ export const payOrder = async (userId: number, orderId: number, input: PayOrderI
     return {
       payment,
       success: isCash || simulatedStatus === PaymentStatus.SUCCESS,
-      message: isCash
-        ? 'Order placed. Please pay at the counter.'
-        : simulatedStatus === PaymentStatus.SUCCESS
-          ? 'Payment successful'
-          : 'Payment failed. Please try again.',
+      message: isCash ? 'Order placed. Please pay at the counter.' : 'Payment successful',
     };
   });
 };
@@ -287,16 +316,39 @@ export const getOrderById = async (orderId: number) => {
 
 export const updateOrderStatus = async (orderId: number, input: UpdateOrderStatusInput) => {
   const order = await prisma.order.findUnique({ where: { id: orderId } });
-
   if (!order) throw new NotFoundError('Order not found');
 
-  const paymentStatusPatch =
-    input.status === OrderStatus.PAID && order.paymentStatus !== PaymentStatus.FAILED ? { paymentStatus: PaymentStatus.SUCCESS } : {};
+  const allowed = ALLOWED_TRANSITIONS[order.status];
+  if (!allowed.includes(input.status)) {
+    throw new ValidationError(`Cannot transition order from ${order.status} to ${input.status}. Allowed: ${allowed.join(', ') || 'none'}`);
+  }
 
-  return prisma.order.update({
-    where: { id: orderId },
-    data: { status: input.status, ...paymentStatusPatch },
-    include: orderInclude,
+  const shouldMarkPaymentSuccess = input.status === OrderStatus.PAID && order.paymentStatus !== PaymentStatus.FAILED;
+
+  return prisma.$transaction(async tx => {
+    if (shouldMarkPaymentSuccess) {
+      await tx.payment.updateMany({
+        where: { orderId, status: PaymentStatus.PENDING },
+        data: { status: PaymentStatus.SUCCESS },
+      });
+    }
+
+    const updated = await tx.order.update({
+      where: { id: orderId },
+      data: {
+        status: input.status,
+        ...(shouldMarkPaymentSuccess ? { paymentStatus: PaymentStatus.SUCCESS } : {}),
+      },
+      include: orderInclude,
+    });
+
+    emitOrderStatusUpdate(updated.userId, {
+      orderId: updated.id,
+      status: updated.status,
+      updatedAt: new Date().toISOString(),
+    });
+
+    return updated;
   });
 };
 

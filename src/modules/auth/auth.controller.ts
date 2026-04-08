@@ -3,6 +3,8 @@ import { registerUser, loginUser, refreshSession, updateRefreshToken } from './a
 import { getGoogleAuthUrl, handleGoogleCallback } from './google.service';
 import { UnauthorizedError } from '../../utils/errors';
 import { verifyRefreshToken } from '../../utils/jwt';
+import redis from '../../lib/redis/redis.client';
+import { randomUUID } from 'crypto';
 
 const isProd = process.env.NODE_ENV === 'production';
 const FRONTEND_URL = process.env.FRONTEND_URL!;
@@ -71,15 +73,26 @@ export const logout = async (req: Request, res: Response) => {
   res.json({ message: 'User successfully logged out' });
 };
 
-export const googleRedirect = (_req: Request, res: Response) => {
-  const url = getGoogleAuthUrl();
+export const googleRedirect = async (_req: Request, res: Response) => {
+  const url = await getGoogleAuthUrl();
   res.redirect(url);
 };
 
 export const googleCallback = async (req: Request, res: Response) => {
   const code = req.query.code as string | undefined;
+  const state = req.query.state as string | undefined;
 
   if (!code) {
+    res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
+    return;
+  }
+
+  if (!state) {
+    res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
+    return;
+  }
+  const storedState = await redis.getdel(`oauth:state:${state}`);
+  if (!storedState) {
     res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
     return;
   }
@@ -87,9 +100,34 @@ export const googleCallback = async (req: Request, res: Response) => {
   try {
     const { accessToken, refreshToken } = await handleGoogleCallback(code);
 
-    res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
-    res.redirect(`${FRONTEND_URL}/auth/google/success?accessToken=${accessToken}`);
+    const tempCode = randomUUID();
+    await redis.set(`oauth:code:${tempCode}`, JSON.stringify({ accessToken, refreshToken }), 'EX', 60);
+
+    res.redirect(`${FRONTEND_URL}/auth/google/success?code=${tempCode}`);
   } catch {
     res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
   }
+};
+
+// Frontend calls this endpoint to exchange the one-time code for real tokens.
+export const googleExchange = async (req: Request, res: Response) => {
+  const tempCode = req.query.code as string | undefined;
+
+  if (!tempCode) {
+    throw new UnauthorizedError('Missing exchange code');
+  }
+
+  // GETDEL atomically retrieves and deletes — one-time use enforced at the Redis level
+  const raw = await redis.getdel(`oauth:code:${tempCode}`);
+  if (!raw) {
+    throw new UnauthorizedError('Invalid or expired exchange code');
+  }
+
+  const { accessToken, refreshToken } = JSON.parse(raw) as {
+    accessToken: string;
+    refreshToken: string;
+  };
+
+  res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
+  res.json({ accessToken });
 };

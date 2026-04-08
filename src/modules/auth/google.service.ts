@@ -1,23 +1,31 @@
 import { OAuth2Client } from 'google-auth-library';
 import bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 import prisma from '../../prisma';
 import { generateAccessToken, generateRefreshToken } from '../../utils/jwt';
 import { updateRefreshToken } from './auth.service';
 import { AppError } from '../../utils/errors';
 import { logger } from '../../utils/logger';
+import redis from '../../lib/redis/redis.client';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_AUTH_CLIENT_ID!;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_AUTH_CLIENT_SECRET!;
-const BACKEND_URL = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 4000}`;
+const BACKEND_URL = process.env.BACKEND_URL || `http://localhost:${process.env.BACKEND_PORT || 4000}`;
 const GOOGLE_REDIRECT_URI = `${BACKEND_URL}/auth/google/callback`;
 
 const oauthClient = new OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI);
 
-export const getGoogleAuthUrl = () => {
+// Generates a Google OAuth URL and stores a CSRF state token in Redis (TTL 10 min)
+export const getGoogleAuthUrl = async (): Promise<string> => {
+  const state = randomUUID();
+  // Store state in Redis — verified atomically on callback, then deleted
+  await redis.set(`oauth:state:${state}`, '1', 'EX', 600);
+
   return oauthClient.generateAuthUrl({
     access_type: 'offline',
     scope: ['openid', 'email', 'profile'],
     prompt: 'consent',
+    state,
   });
 };
 
