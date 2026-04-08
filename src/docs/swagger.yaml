@@ -1,10 +1,29 @@
 openapi: 3.0.3
 info:
-  title: Jolie Bar & Restaurant API
+  title: Jolie Brasserie Café API
   description: >-
-    Comprehensive API for the Jolie bar ordering system — managing dishes,
-    ingredients, orders, reservations, cart, payments, users, and more.
-  version: '1.0.0'
+    REST API for the Jolie Brasserie Café restaurant management platform.
+
+
+    * **Authentication:** Most endpoints require a Bearer JWT token:
+      `Authorization: Bearer <access_token>`
+
+
+    * **Tokens:** Obtain via `POST /auth/login` or `POST /auth/register`. Tokens expire after 15 minutes. Use `POST /auth/refresh` (sends the httpOnly refresh cookie automatically) to obtain a new access token.
+
+
+    * **Google OAuth:** Redirect the user to `GET /auth/google`. After Google redirects back, the frontend exchanges the one-time code via `GET /auth/google/exchange`.
+
+
+    * **WebSockets:** Real-time events are delivered via Socket.IO. Connect with:
+      `io(BASE_URL, { auth: { token: accessToken } })`
+
+
+    * **Rate Limiting:** Auth endpoints are limited to 10 requests per 15 minutes. All other endpoints allow 200 requests per 15 minutes.
+
+
+    * **Errors:** All errors return `{"message": "Human readable error"}`. Validation errors include an `issues` array.
+  version: '1.1.0'
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
@@ -18,31 +37,48 @@ servers:
 
 tags:
   - name: Health
-    description: Health check endpoint
+    description: Liveness and readiness probes
   - name: Auth
-    description: Authentication and authorization
+    description: >-
+      Register, login, token refresh/logout, and Google OAuth flow.
+      Access tokens are short-lived (15 min). Use the refresh endpoint
+      (httpOnly cookie) to obtain a new access token.
   - name: Users
-    description: User profile and admin user management
+    description: >-
+      Current user profile management and admin user management (CRUD, role assignment).
   - name: Addresses
-    description: User delivery addresses
+    description: User delivery addresses (create, read, update, delete, set default).
   - name: Payment Methods
-    description: User payment methods
+    description: >-
+      Saved card management. Cards with linked payments are soft-archived
+      rather than hard-deleted.
   - name: Ingredients
-    description: Ingredient management
+    description: >-
+      Ingredient management. Read access is public; write access requires ADMIN role.
   - name: Dishes
-    description: Dish management and dish-ingredient relations
+    description: >-
+      Menu dish management including ingredient relations and image upload.
+      Read access is public; write access requires ADMIN role.
   - name: Cart
-    description: Shopping cart operations
+    description: >-
+      Shopping cart management. Supports dish items with optional extras
+      (dish-linked ingredients) and standalone ingredient items.
   - name: Orders
-    description: Order placement, tracking, and admin management
+    description: >-
+      Order creation, cancellation, payment, and status management.
+      Orders are created from the current cart contents.
   - name: Reservations
-    description: Table reservations for users and admins
+    description: >-
+      Table reservation system with pre-order support.
+      A confirmation email is sent when an admin sets status to CONFIRMED.
   - name: Tables
-    description: Restaurant table management
+    description: Restaurant table management (per location). Read access is public.
   - name: Settings
-    description: Restaurant settings
+    description: >-
+      Restaurant-wide settings (tax rate, delivery fee, service fee, free delivery threshold).
+      Read access is public; write access requires ADMIN role.
   - name: Locations
-    description: Restaurant location management
+    description: Restaurant location management. Read access is public.
 
 security:
   - bearerAuth: []
@@ -51,16 +87,17 @@ paths:
   # ──────────────────────────────────────────────
   # Health
   # ──────────────────────────────────────────────
-  /health:
+  /healthz:
     get:
       tags:
         - Health
-      summary: Health check
+      summary: Liveness check
+      description: Returns 200 if the process is running.
       security: []
       operationId: healthCheck
       responses:
         '200':
-          description: Server is healthy
+          description: Service is alive
           content:
             application/json:
               schema:
@@ -69,6 +106,32 @@ paths:
                   status:
                     type: string
                     example: ok
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /readyz:
+    get:
+      tags:
+        - Health
+      summary: Readiness check
+      description: >-
+        Returns 200 if both PostgreSQL and Redis are reachable.
+        Returns 503 if either dependency is down.
+      security: []
+      operationId: readinessCheck
+      responses:
+        '200':
+          description: All dependencies healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+        '503':
+          description: One or more dependencies are unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
 
@@ -96,7 +159,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/User'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: User already exists
 
   /auth/login:
     post:
@@ -119,7 +194,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/LoginResponse'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
 
   /auth/refresh:
     post:
@@ -145,7 +224,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/TokenPair'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
 
   /auth/logout:
     post:
@@ -159,6 +242,115 @@ paths:
           description: Logged out successfully
         '400':
           $ref: '#/components/responses/BadRequest'
+
+  /auth/google:
+    get:
+      tags:
+        - Auth
+      summary: Initiate Google OAuth login
+      description: >-
+        Redirects the browser to Google's consent screen.
+        A CSRF state token is stored server-side (Redis, TTL 10 min).
+        After successful Google auth, the user is redirected to
+        `{FRONTEND_URL}/auth/google/success?code=<temp_code>`.
+      security: []
+      operationId: googleRedirect
+      responses:
+        '302':
+          description: Redirect to Google OAuth consent screen
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '200':
+          description: Manual redirect link (for non-browser clients)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    example: https://accounts.google.com/o/oauth2/v2/auth?...
+
+  /auth/google/callback:
+    get:
+      tags:
+        - Auth
+      summary: Google OAuth callback (handled by backend)
+      description: >-
+        Google redirects here after user consent. The backend validates the
+        state parameter, exchanges the code for tokens, finds or creates a
+        user record, and redirects the frontend to
+        `/auth/google/success?code=<one_time_code>`.
+        **Do not call this endpoint directly from the frontend.**
+      security: []
+      operationId: googleCallback
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Authorization code from Google
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+          description: CSRF state token (validated against Redis)
+      responses:
+        '302':
+          description: >-
+            Redirects to `{FRONTEND_URL}/auth/google/success?code=<temp_code>`
+            on success, or `{FRONTEND_URL}/login?error=google_auth_failed`
+            on failure.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '200':
+          description: Success (alternative for non-browser clients)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /auth/google/exchange:
+    get:
+      tags:
+        - Auth
+      summary: Exchange one-time Google OAuth code for tokens
+      description: >-
+        The frontend calls this endpoint after being redirected to
+        `/auth/google/success?code=<temp_code>`.
+        The one-time code is atomically consumed from Redis (TTL 60 sec).
+        Returns an access token and sets the refresh token as an httpOnly cookie.
+        The code can only be used once.
+      security: []
+      operationId: googleExchange
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: One-time exchange code from the redirect URL
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                    description: JWT access token
+              example:
+                accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        '401':
+          description: Missing, invalid, or already-used exchange code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   # ──────────────────────────────────────────────
   # Users
@@ -197,7 +389,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/User'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -238,9 +434,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/PaginatedUsers'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -288,7 +482,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/User'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -335,7 +533,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Address'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
     get:
@@ -377,7 +579,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Address'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -440,7 +646,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaymentMethod'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
     get:
@@ -500,7 +710,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaymentMethod'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -579,7 +793,11 @@ paths:
                 items:
                   $ref: '#/components/schemas/Ingredient'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
     post:
       tags:
         - Ingredients
@@ -599,7 +817,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Ingredient'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -644,7 +866,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Ingredient'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -759,7 +985,11 @@ paths:
                 items:
                   $ref: '#/components/schemas/Dish'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
     post:
       tags:
         - Dishes
@@ -779,7 +1009,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Dish'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -824,7 +1058,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Dish'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -870,7 +1108,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/DishIngredient'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -901,7 +1143,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/DishIngredient'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1027,7 +1273,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/CartItem'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -1053,7 +1303,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/CartItem'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -1095,7 +1349,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/CartItemExtra'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -1124,7 +1382,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/CartItemExtra'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -1165,7 +1427,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/CartIngredientItem'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -1195,7 +1461,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/CartIngredientItem'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -1242,7 +1512,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Order'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
     get:
@@ -1280,9 +1554,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Order'
+                $ref: '#/components/schemas/PaginatedOrders'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -1346,9 +1618,22 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Payment'
+                $ref: '#/components/schemas/PayOrderResponse'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '402':
+          description: Payment processing failed (non-cash)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayOrderResponse'
+              example:
+                success: false
+                message: Card payment failed
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -1390,9 +1675,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Order'
+                $ref: '#/components/schemas/PaginatedOrders'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1469,7 +1752,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Order'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1500,7 +1787,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Reservation'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
     get:
@@ -1514,9 +1805,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Reservation'
+                $ref: '#/components/schemas/PaginatedReservations'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -1603,9 +1892,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Reservation'
+                $ref: '#/components/schemas/PaginatedReservations'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1631,7 +1918,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Reservation'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1659,7 +1950,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Reservation'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1723,7 +2018,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Table'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1751,7 +2050,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Table'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1815,7 +2118,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Settings'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1882,7 +2189,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Location'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1910,7 +2221,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Location'
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2026,6 +2341,50 @@ components:
       properties:
         message:
           type: string
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Validation failed
+        issues:
+          type: array
+          items:
+            type: object
+            properties:
+              path:
+                type: array
+                items:
+                  type: string
+              message:
+                type: string
+          example:
+            - path: ['email']
+              message: Invalid email address
+            - path: ['password']
+              message: Password must be at least 6 characters
+
+    ReadinessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        checks:
+          type: object
+          properties:
+            redis:
+              type: string
+              enum: [ok, down]
+            db:
+              type: string
+              enum: [ok, down]
+      example:
+        status: ok
+        checks:
+          redis: ok
+          db: ok
 
     # ── Auth request / response ──
     RegisterRequest:
@@ -2750,6 +3109,21 @@ components:
             - CASH
             - BLIK
 
+
+    PayOrderResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: >-
+            true for CARD and BLIK payments.
+            false for CASH (pending counter payment).
+        message:
+          type: string
+          example: Payment successful
+        payment:
+          $ref: '#/components/schemas/Payment'
+
     # ── Reservation ──
     Reservation:
       type: object
@@ -3052,3 +3426,46 @@ components:
           maxLength: 50
         isActive:
           type: boolean
+
+    PaginatedOrders:
+      type: object
+      properties:
+        orders:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    PaginatedReservations:
+      type: object
+      properties:
+        reservations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reservation'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    PaginatedUsers:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
