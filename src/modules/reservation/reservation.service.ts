@@ -1,7 +1,7 @@
 import prisma from '../../prisma';
 import { ReservationStatus } from '../../generated/prisma/client';
 import { NotFoundError, ValidationError } from '../../utils/errors';
-import { sendReservationConfirmation } from '../../utils/mailer';
+import { sendReservation } from '../../utils/mail/services/sendReservation';
 import { getSettings } from '../settings/settings.service';
 import { CreateReservationInput, AdminCreateReservationInput, AdminUpdateReservationInput, ReservationQuery } from './reservation.schema';
 import { emitReservationStatusUpdate, emitNewReservationToAdmins } from '../../lib/socket/events';
@@ -204,7 +204,7 @@ export const adminUpdateReservation = async (id: number, input: AdminUpdateReser
   // Send confirmation email when status changes to CONFIRMED
   if (input.status === ReservationStatus.CONFIRMED && updated.table) {
     const settings = await getSettings();
-    await sendReservationConfirmation({
+    await sendReservation({
       to: reservation.user.email,
       name: reservation.user.name ?? 'Guest',
       date: updated.date,
