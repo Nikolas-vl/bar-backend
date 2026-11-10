@@ -1,0 +1,31 @@
+ai-integration-learning/package-lock.json
+  s_ef5e93c2a2fca9::t_3b857a95a9520b 1-1000
+ai-integration-learning/package.json
+  s_ef5e93c2a2fca9::t_2d022d0dbf1b59 1-23
+ai-integration-learning/src/embeddings.ts
+  s_ef5e93c2a2fca9::t_9fa9ef7d305aa2 1-10
+ai-integration-learning/src/index.ts
+  s_ef5e93c2a2fca9::t_c7ac05a51c768d 1-92
+ai-integration-learning/tsconfig.json
+  s_ef5e93c2a2fca9::t_1e50cd0615b231 1-45
+src/modules/ai/ai.routes.ts
+  s_ef5e93c2a2fca9::t_b5996b6172c8e6 1-4
+src/modules/ai/ai.service.ts
+  s_ef5e93c2a2fca9::t_530f09241cafc3 1-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "801caa2becf50352bb40e39a5601f196fa1de207",
+  "prompts": {},
+  "sessions": {
+    "s_ef5e93c2a2fca9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e82be8d-00da-49fb-8aae-edd09ca10210",
+        "model": "unknown"
+      },
+      "human_author": "Nikolas <nikvv02@gmail.com>"
+    }
+  }
+}
