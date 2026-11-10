@@ -1,87 +1,144 @@
-# ──────────────────────────────────────────────────────────
-# docker-compose.yml  —  DEVELOPMENT ONLY
+# ──────────────────────────────────────────────────────────────────────────────
+# docker-compose.yml — DEVELOPMENT (single source of truth for backend infra)
 #
-# Uses bind-mount + ts-node-dev for hot reload.
-# For production deploy, use:
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up
-# ──────────────────────────────────────────────────────────
+#   postgres  pgvector/pgvector:pg17   host 127.0.0.1:${POSTGRES_HOST_PORT:-5435} -> 5432
+#             databases: ${POSTGRES_DB} (app, Prisma) + ${POSTGRES_AI_DB} (pgvector lab)
+#   redis     redis:7.2-alpine         host 127.0.0.1:${REDIS_HOST_PORT:-6380}   -> 6379
+#   migrate   one-shot `prisma migrate deploy`, runs before the backend starts
+#   backend   ts-node-dev hot reload, http://localhost:${BACKEND_PORT:-4000}
+#
+# Inside the Compose network services talk via service names (postgres:5432,
+# redis:6379). The host ports above are only for tools running on your machine.
+#
+# Production:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# ──────────────────────────────────────────────────────────────────────────────
+name: bar-backend
+
+x-backend-env: &backend-env # Override the localhost values from .env with Docker service names/ports.
+  DATABASE_URL: postgresql://${POSTGRES_USER:-jolie}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-jolie_app}
+  AI_DATABASE_URL: postgresql://${POSTGRES_USER:-jolie}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_AI_DB:-jolie_ai}
+  REDIS_HOST: redis
+  REDIS_PORT: '6379'
+  # Ollama runs on the host, not in Compose
+  OLLAMA_HOST: http://host.docker.internal:11434
+
 services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: jolie_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-jolie}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-jolie_app}
+      POSTGRES_AI_DB: ${POSTGRES_AI_DB:-jolie_ai}
+    ports:
+      - '127.0.0.1:${POSTGRES_HOST_PORT:-5435}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Runs only when the data volume is empty (first start / after `down -v`)
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Check over TCP: during first-run initialisation the entrypoint runs a
+      # temporary socket-only server, so this only passes once init scripts are done.
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -h 127.0.0.1 -p 5432']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - jolie_network
+
   redis:
     image: redis:7.2-alpine
     container_name: jolie_redis
     restart: unless-stopped
-    ports:
-      - '${REDIS_PORT:-6379}:6379'
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     command: >
       sh -c '
         if [ -n "$$REDIS_PASSWORD" ]; then
-          redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes --appendfsync everysec
+          exec redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes --appendfsync everysec
         else
-          redis-server --appendonly yes --appendfsync everysec
+          exec redis-server --appendonly yes --appendfsync everysec
         fi
       '
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    ports:
+      - '127.0.0.1:${REDIS_HOST_PORT:-6380}:6379'
     volumes:
       - redis_data:/data
     healthcheck:
-      test: >
-        sh -c '
-          if [ -n "$$REDIS_PASSWORD" ]; then
-            redis-cli -a "$$REDIS_PASSWORD" ping
-          else
-            redis-cli ping
-          fi
-        '
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - jolie_network
-  backend:
-    build: .
-    container_name: jolie_backend
-    # Dev: bind-mount source + hot-reload via ts-node-dev
-    volumes:
-      - .:/app
-      - node_modules:/app/node_modules
-    command: npm run dev
-    restart: unless-stopped
-    ports:
-      - '${BACKEND_PORT:-4000}:${BACKEND_PORT:-4000}'
-    env_file:
-      - .env
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    networks:
-      - jolie_network
-  postgres:
-    image: postgres:15-alpine
-    container_name: jolie_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-app}
-      POSTGRES_USER: ${POSTGRES_USER:-user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - jolie_network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-app}"]
+      test:
+        - CMD-SHELL
+        - 'if [ -n "$$REDIS_PASSWORD" ]; then redis-cli -a "$$REDIS_PASSWORD" --no-auth-warning ping; else redis-cli ping; fi | grep -q PONG'
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 5s
+    networks:
+      - jolie_network
+
+  migrate:
+    build:
+      context: .
+      target: dev
+    image: jolie-backend:dev
+    container_name: jolie_migrate
+    command: ['npx', 'prisma', 'migrate', 'deploy']
+    env_file:
+      - .env
+    environment:
+      <<: *backend-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+    networks:
+      - jolie_network
+
+  backend:
+    build:
+      context: .
+      target: dev
+    image: jolie-backend:dev
+    container_name: jolie_backend
+    # Regenerate the Prisma client into the bind-mounted src/generated, then hot-reload.
+    command: ['sh', '-c', 'npx prisma generate && npm run dev']
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      <<: *backend-env
+    ports:
+      - '${BACKEND_PORT:-4000}:${BACKEND_PORT:-4000}'
+    volumes:
+      # Bind-mount sources only. node_modules stays the one baked into the image,
+      # so it can never go stale or be shadowed by a host/Windows install.
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+      - ./prisma.config.ts:/app/prisma.config.ts:ro
+      - ./tsconfig.json:/app/tsconfig.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- "http://127.0.0.1:$${BACKEND_PORT:-4000}/readyz" >/dev/null || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+    networks:
+      - jolie_network
+
 networks:
   jolie_network:
     driver: bridge
+
 volumes:
-  redis_data:
   postgres_data:
-  node_modules:
+  redis_data:

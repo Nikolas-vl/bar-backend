@@ -1,21 +1,22 @@
-# ──────────────────────────────────────────────────────────
-# docker-compose.prod.yml  —  PRODUCTION OVERRIDES
+# ──────────────────────────────────────────────────────────────────────────────
+# docker-compose.prod.yml — PRODUCTION OVERRIDES
 #
-# Apply on top of docker-compose.yml:
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 #
-# This file overrides the backend service to:
-#   - Remove the source bind-mount (no source code in container)
-#   - Use the compiled Dockerfile CMD (prisma migrate + node dist/)
-#   - Set NODE_ENV=production
-#   - Disable ts-node-dev hot re*load
-# ──────────────────────────────────────────────────────────
+# Overrides the backend to run the compiled `prod` image (node dist/index.js):
+#   - no source bind-mounts
+#   - NODE_ENV=production
+#   - migrations still run first via the one-shot `migrate` service
+# ──────────────────────────────────────────────────────────────────────────────
 services:
   backend:
-    # No source bind-mount — image contains only the compiled dist/
-    volumes: []
-    # command is intentionally omitted so Docker falls back to the Dockerfile CMD:
-    #   npx prisma migrate deploy && node dist/index.js
+    build:
+      context: .
+      target: prod
+    image: jolie-backend:prod
+    command: ['node', 'dist/index.js']
+    volumes: !reset []
     environment:
       NODE_ENV: production
+      LOG_PRETTY: 'false'
     restart: always
