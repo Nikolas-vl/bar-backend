@@ -2,9 +2,15 @@ node_modules
 npm-debug.log
 Dockerfile
 .dockerignore
+docker-compose*.yml
 .git
 .gitignore
 .env
-.env.local
-.env.prod
+.env.*
+!.env.example
 dist
+# Generated inside the image by `prisma generate`
+src/generated
+# Separate learning project with its own deps and secrets
+ai-integration-learning
+docker

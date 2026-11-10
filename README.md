@@ -9,19 +9,18 @@ Production-grade REST + WebSocket API for a full-stack restaurant management pla
 1. [Overview](#overview)
 2. [Tech Stack](#tech-stack)
 3. [Project Structure](#project-structure)
-4. [Quick Start — Local](#quick-start--local)
-5. [Quick Start — Docker](#quick-start--docker)
-6. [Environment Variables](#environment-variables)
-7. [Database](#database)
-8. [Redis](#redis)
-9. [WebSockets](#websockets)
-10. [Authentication](#authentication)
-11. [Media Handling](#media-handling)
-12. [Email](#email)
-13. [API Overview](#api-overview)
-14. [Architecture](#architecture)
-15. [Known Limitations](#known-limitations)
-16. [Roadmap](#roadmap)
+4. [Quick Start — Local Development Infrastructure](#quick-start--local-development-infrastructure)
+5. [Environment Variables](#environment-variables)
+6. [Database](#database)
+7. [Redis](#redis)
+8. [WebSockets](#websockets)
+9. [Authentication](#authentication)
+10. [Media Handling](#media-handling)
+11. [Email](#email)
+12. [API Overview](#api-overview)
+13. [Architecture](#architecture)
+14. [Known Limitations](#known-limitations)
+15. [Roadmap](#roadmap)
 
 ---
 
@@ -51,7 +50,7 @@ Key capabilities:
 | Framework        | Express 5                                |
 | Language         | TypeScript 5                             |
 | ORM              | Prisma 7 (`@prisma/adapter-pg`)          |
-| Database         | PostgreSQL 15                            |
+| Database         | PostgreSQL 17 + pgvector                 |
 | Cache / Pub-Sub  | Redis 7 (ioredis)                        |
 | Real-time        | Socket.IO 4 + `@socket.io/redis-adapter` |
 | Validation       | Zod 4                                    |
@@ -114,163 +113,149 @@ module/
 
 ---
 
-## Quick Start — Local
+## Quick Start — Local Development Infrastructure
 
-### Prerequisites
+Docker Compose is the single source of truth for the backend infrastructure
+(PostgreSQL + Redis). **No locally installed PostgreSQL or Redis is used** — a Windows
+PostgreSQL service on `5432` or a Redis service on `6379` can keep running for other
+projects; this project deliberately uses different host ports.
 
-- Node.js 22+
-- PostgreSQL 15+
-- Redis 7+
+### Required software
 
-### Steps
+- Docker Desktop (Compose v2)
+- Node.js 22+ and npm (only for running the backend / Prisma CLI on the host)
+- Optional: [Ollama](https://ollama.com) on the host for the AI experiments (`embeddinggemma` model)
+
+### Architecture and ports
+
+| Service    | Image                    | From the host (`localhost`) | Inside Docker (`service:port`) | Purpose                          |
+| ---------- | ------------------------ | --------------------------- | ------------------------------ | -------------------------------- |
+| `postgres` | `pgvector/pgvector:pg17` | `127.0.0.1:5435`            | `postgres:5432`                | PostgreSQL 17 + pgvector         |
+| `redis`    | `redis:7.2-alpine`       | `127.0.0.1:6380`            | `redis:6379`                   | Cache, OAuth state, Socket.IO    |
+| `migrate`  | `jolie-backend:dev`      | —                           | —                              | One-shot `prisma migrate deploy` |
+| `backend`  | `jolie-backend:dev`      | `localhost:4000`            | `backend:4000`                 | Express API (hot reload)         |
+
+One PostgreSQL server, two databases:
+
+| Database    | Env variable      | Used by                                             |
+| ----------- | ----------------- | --------------------------------------------------- |
+| `jolie_app` | `DATABASE_URL`    | The application: Prisma migrations, seed, backend   |
+| `jolie_ai`  | `AI_DATABASE_URL` | AI / pgvector experiments only (`vector` extension) |
+
+Host ports are configurable with `POSTGRES_HOST_PORT` / `REDIS_HOST_PORT` in `.env`
+(keep `DATABASE_URL`, `AI_DATABASE_URL` and `REDIS_PORT` in sync if you change them).
+
+### One `.env` for both modes
 
 ```bash
-# 1. Install dependencies
-npm install
-
-# 2. Copy environment file
-cp .env.example .env
-# Fill in all required values (see Environment Variables section)
-
-# 3. Run database migrations
-npx prisma migrate dev
-
-# 4. (Optional) Seed the database
-npm run seed
-
-# 5. Start in development mode (ts-node-dev with hot reload)
-npm run dev
+cp .env.example .env   # then set POSTGRES_PASSWORD (URL-safe) and the same value in both URLs
 ```
 
-The API will be available at `http://localhost:4000`.
-Swagger UI: `http://localhost:4000/api-docs`.
+- **Locally** (`npm run dev`, Prisma CLI, scripts) the values in `.env` are used as written:
+  `localhost:5435` for PostgreSQL and `localhost:6380` for Redis.
+- **In Docker** `docker-compose.yml` overrides `DATABASE_URL`, `AI_DATABASE_URL`,
+  `REDIS_HOST` and `REDIS_PORT` with the service names (`postgres:5432`, `redis:6379`),
+  built from the `POSTGRES_*` variables. Never put `localhost` URLs into the container by hand.
+- `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` / `POSTGRES_AI_DB` only take effect
+  when the Postgres volume is first created. After changing them, recreate it (`down -v`).
 
----
-
-## Quick Start — Docker
-
-### Prerequisites
-
-- Docker Desktop or Docker Engine + Compose v2
-
-### Start all services
+### Start / stop
 
 ```bash
-# Copy and fill in environment variables
-cp .env.example .env
-
-# Start postgres + redis + backend
-docker compose up -d
-
-# Follow logs
+docker compose up -d --build     # postgres + redis -> migrate -> backend
 docker compose logs -f backend
+docker compose ps                # all services should be (healthy); migrate "Exited (0)"
+
+docker compose down              # stop, keep data
+docker compose down -v           # stop and DELETE the database + redis volumes
 ```
 
-Services started:
+Startup order is enforced with health checks: `migrate` waits until PostgreSQL accepts
+TCP connections (i.e. first-run init scripts are finished), `backend` waits for a
+successful `migrate` and a healthy Redis. The backend health check calls `/readyz`
+(PostgreSQL + Redis).
 
-| Service    | Port   | Description   |
-| ---------- | ------ | ------------- |
-| `backend`  | `4000` | Express API   |
-| `postgres` | `5432` | PostgreSQL 15 |
-| `redis`    | `6379` | Redis 7       |
-
-### Run migrations inside Docker
+### Initialise a fresh database
 
 ```bash
-docker compose exec backend npx prisma migrate deploy
+docker compose down -v           # only if you want to wipe the existing data
+docker compose up -d --build     # creates jolie_app + jolie_ai, applies all migrations
+npm run db:seed                  # from the host (or the Docker variant below)
 ```
 
-### Seed the database
+On first start of an empty volume `docker/postgres/initdb/` creates the `jolie_ai`
+database, enables `vector` in it and creates the `documents` / `food_documents` tables.
+`jolie_app` is managed exclusively by Prisma migrations.
+
+### Migrations and seed
+
+| Task                         | From the host                             | In Docker                                                   |
+| ---------------------------- | ----------------------------------------- | ----------------------------------------------------------- |
+| Apply migrations             | `npm run db:migrate`                      | `docker compose run --rm migrate`                           |
+| Migration status             | `npm run db:status`                       | `docker compose run --rm migrate npx prisma migrate status` |
+| Seed                         | `npm run db:seed`                         | `docker compose run --rm migrate npx prisma db seed`        |
+| Create a new migration (dev) | `npm run db:migrate:dev -- --name <name>` | —                                                           |
+| Regenerate Prisma client     | `npm run db:generate`                     | automatic on backend start                                  |
+
+The seed is repeatable: it deletes all application rows and re-creates them (IDs keep
+increasing because sequences are not reset). Test logins: `admin@jolie.com` /
+`john.doe@example.com`, password `password123`.
+
+### Run the backend locally (outside Docker)
 
 ```bash
-docker compose exec backend npm run seed
+npm install
+docker compose up -d postgres redis    # infrastructure only
+npm run db:migrate && npm run db:seed  # first time
+npm run dev                            # http://localhost:4000, Swagger at /api-docs
 ```
 
-### Stop and remove volumes (full reset)
+Stop the Docker `backend` container first (`docker compose stop backend`) or set
+`BACKEND_PORT` to another port, since both use `4000`.
+
+### Run the backend in Docker
 
 ```bash
-# Stop containers only
-docker compose down
-
-# Stop containers AND delete all data volumes
-docker compose down -v
+docker compose up -d --build           # dev: bind-mounted src/, ts-node-dev hot reload
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build   # compiled prod image
 ```
 
-### Rebuild after code changes
+Rebuild the image (`--build`) after changing `package.json` dependencies.
+
+### Connect with a database client (DBeaver, pgAdmin, psql)
+
+| Setting  | Value                                            |
+| -------- | ------------------------------------------------ |
+| Host     | `localhost` (or `127.0.0.1`)                     |
+| Port     | `5435`                                           |
+| Database | `jolie_app` (application) or `jolie_ai` (AI lab) |
+| User     | `POSTGRES_USER` from `.env` (default `jolie`)    |
+| Password | `POSTGRES_PASSWORD` from `.env`                  |
 
 ```bash
-docker compose up -d --build backend
+docker compose exec postgres psql -U jolie -d jolie_app
+docker compose exec redis redis-cli
 ```
 
-> **Note:** The development compose file uses a bind-mount so source changes trigger `ts-node-dev` hot reload without rebuilding the image.
+### AI / pgvector experiments
 
-See [`src/docs/DOCKER.md`](./src/docs/DOCKER.md) for the full event reference.
+- AI scripts connect **only** to `AI_DATABASE_URL` (`jolie_ai`). They refuse to start
+  if it is missing or equal to `DATABASE_URL` — they never fall back to the app database.
+- Ollama runs on the host (`OLLAMA_HOST=http://localhost:11434`; containers use
+  `host.docker.internal:11434`).
+- Example: `npm run ai:embed` embeds a text with `embeddinggemma` (768 dims) and inserts
+  it into `jolie_ai.food_documents`.
+- Re-apply the AI schema by hand (idempotent):
+  `docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_AI_DB"' < docker/postgres/initdb/sql/ai-lab-schema.sql`
 
 ---
 
 ## Environment Variables
 
-Create a `.env` file in the project root. All variables are required unless marked optional.
+All variables are documented in [`.env.example`](./.env.example). Keep comments on their
+own lines: Docker Compose turns `KEY=   # comment` into the literal value `# comment`.
 
-```dotenv
-# ── Application ──────────────────────────────────────────────────────────────
-NODE_ENV=development          # development | production | test
-BACKEND_PORT=4000             # Port the HTTP server listens on
-
-# ── Database ──────────────────────────────────────────────────────────────────
-DATABASE_URL=postgresql://user:password@localhost:5432/app
-
-# ── JWT ───────────────────────────────────────────────────────────────────────
-# Generate with:
-#   node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
-JWT_ACCESS_SECRET=<64-byte-hex>
-JWT_ACCESS_EXPIRES=15m        # Access token lifetime (ms/s/m/h/d format)
-JWT_REFRESH_SECRET=<64-byte-hex>
-JWT_REFRESH_EXPIRES=7d        # Refresh token lifetime
-
-# ── CORS ──────────────────────────────────────────────────────────────────────
-# Comma-separated list of allowed origins
-CORS_ORIGIN=http://localhost:3000
-
-# ── Cloudinary (image uploads) ────────────────────────────────────────────────
-CLOUDINARY_CLOUD_NAME=
-CLOUDINARY_API_KEY=
-CLOUDINARY_API_SECRET=
-
-# ── SMTP (email) ──────────────────────────────────────────────────────────────
-SMTP_HOST=smtp.ethereal.email # Use Ethereal for development
-SMTP_PORT=587
-SMTP_USER=
-SMTP_PASSWORD=
-SMTP_FROM=noreply@jolie.com   # Optional — falls back to SMTP_USER
-
-# ── Google OAuth ──────────────────────────────────────────────────────────────
-GOOGLE_AUTH_CLIENT_ID=
-GOOGLE_AUTH_CLIENT_SECRET=
-FRONTEND_URL=http://localhost:3000   # Where the frontend lives (callback redirect)
-APP_URL=http://localhost:4000        # Backend's own public URL (for OAuth redirect URI)
-
-# ── Logging ───────────────────────────────────────────────────────────────────
-LOG_PRETTY=true               # true = pino-pretty (dev), false = JSON (prod)
-LOG_LEVEL=debug               # trace | debug | info | warn | error
-
-# ── Redis ─────────────────────────────────────────────────────────────────────
-REDIS_HOST=localhost           # Hostname of Redis server
-REDIS_PORT=6379
-REDIS_USERNAME=               # Optional — leave empty for default
-REDIS_PASSWORD=               # Optional — leave empty if no password
-REDIS_DB=0                    # Redis database index
-REDIS_CACHE_TTL=300           # Default cache TTL in seconds (fallback)
-REDIS_URL=                    # Optional — full URL, e.g. redis://user:pw@host:6379/0
-
-# ── Docker Compose (PostgreSQL) ───────────────────────────────────────────────
-# Only needed when running via docker-compose
-POSTGRES_DB=app
-POSTGRES_USER=user
-POSTGRES_PASSWORD=secret
-```
-
-> **Production tip:** Never commit `.env` to version control. Use a secrets manager (AWS Secrets Manager, Doppler, etc.) in production.
+> Never commit `.env`. Use a secrets manager in production.
 
 ---
 
@@ -278,36 +263,19 @@ POSTGRES_PASSWORD=secret
 
 ### ORM
 
-This project uses **Prisma 7** with the `@prisma/adapter-pg` driver adapter for direct `pg` connection pooling.
-
-Schema location: `prisma/schema.prisma`
-
-### Common commands
+This project uses **Prisma 7** with the `@prisma/adapter-pg` driver adapter. The schema
+is `prisma/schema.prisma`; the Prisma CLI reads `DATABASE_URL` through `prisma.config.ts`
+(which also defines the seed command). The generated client lives in `src/generated/prisma`
+(git-ignored, created by `prisma generate`).
 
 ```bash
-# Create and apply a new migration (dev)
-npx prisma migrate dev --name <migration_name>
-
-# Apply existing migrations (CI / production)
-npx prisma migrate deploy
-
-# Open Prisma Studio (visual DB browser)
-npx prisma studio
-
-# Regenerate the Prisma client after schema changes
-npx prisma generate
-
-# Reset database (drops all data — dev only)
-npx prisma migrate reset
+npx prisma studio          # visual DB browser (uses DATABASE_URL -> localhost:5435)
+npx prisma migrate reset   # drop + re-migrate + seed jolie_app (dev only)
 ```
 
 ### Seed
 
-```bash
-npm run seed
-# or directly:
-npx ts-node prisma/seed.ts
-```
+`prisma/seed.ts`, run with `npm run db:seed`.
 
 The seed creates:
 
